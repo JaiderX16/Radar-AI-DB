@@ -28,12 +28,12 @@ print("Iniciando chatbot con IA real (Google Gemini)...")
 print("Conectando a MySQL...")
 print("API Key de Gemini configurada")
 
-# Configurar modelo optimizado para velocidad extrema
+# Configurar modelo para respuestas completas y de calidad
 generation_config = {
-    "temperature": 0.1,  # Mínimo para máxima velocidad
-    "top_p": 0.7,      # Más restrictivo
-    "top_k": 10,       # Mínimo para respuestas rápidas
-    "max_output_tokens": 150,  # Máximo muy reducido
+    "temperature": 0.7,  # Valor equilibrado para creatividad y coherencia
+    "top_p": 0.9,      # Menos restrictivo para respuestas más variadas
+    "top_k": 40,       # Valor más alto para mayor diversidad
+    "max_output_tokens": 1024,  # Permitir respuestas mucho más largas
 }
 
 model = genai.GenerativeModel(
