@@ -97,6 +97,12 @@ system_info = {
 
 def detect_simple_message(message):
     """Detectar mensajes simples que no requieren contexto de base de datos"""
+    # Desactivamos la detección de mensajes simples para usar siempre la API de Gemini
+    # y evitar respuestas predefinidas
+    return None
+    
+    # Código original comentado:
+    """
     message_lower = message.lower().strip()
     
     # Saludos comunes
@@ -117,6 +123,7 @@ def detect_simple_message(message):
         return 'simple'
     
     return None
+    """
 
 def get_simple_response(message_type, original_message):
     """Obtener respuesta simple para mensajes básicos"""
