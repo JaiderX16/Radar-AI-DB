@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot IA - Lugares de Huancayo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #000000, #333333);
+            color: #ffffff;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 800px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 0;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.bot {
+            justify-content: flex-start;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 20px;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        /* Estilos mejorados para el contenido formateado */
+        .message-content h2 {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 15px 0 10px 0;
+            color: #000000;
+        }
+
+        .message-content h3 {
+            font-size: 17px;
+            font-weight: bold;
+            margin: 12px 0 8px 0;
+            color: #333333;
+        }
+
+        .message-content h4 {
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 0 6px 0;
+            color: #555555;
+        }
+
+        .message-content strong {
+            font-weight: bold;
+            color: #000000;
+        }
+
+        .message-content ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .message-content li {
+            margin: 8px 0;
+            line-height: 1.5;
+        }
+
+        .message-content p {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+
+        .message.bot .message-content {
+            background: #f8f9fa;
+            color: #000000;
+            border: 1px solid #dee2e6;
+        }
+
+        .message.user .message-content {
+            background: #000000;
+            color: #ffffff;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 15px 20px;
+            color: #666666;
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+
+        .typing-dots {
+            display: inline-block;
+        }
+
+        .typing-dots span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #666;
+            margin: 0 2px;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        .input-container {
+            background: #ffffff;
+            border-top: 1px solid #e0e0e0;
+            padding: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            position: sticky;
+            bottom: 0;
+        }
+
+        .new-chat-button {
+            padding: 12px 16px;
+            background: #000000;
+            color: #ffffff;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            white-space: nowrap;
+            transition: background 0.3s;
+        }
+
+        .new-chat-button:hover {
+            background: #333333;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #000000;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            background: #ffffff;
+            color: #000000;
+            transition: all 0.3s ease;
+        }
+
+        .message-input:focus {
+            border-color: #333333;
+            box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
+        }
+
+        .message-input::placeholder {
+            color: #999999;
+        }
+
+        .send-button {
+            background: #000000;
+            color: #ffffff;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .send-button:hover:not(:disabled) {
+            transform: scale(1.1);
+            background: #333333;
+        }
+
+        .send-button:active:not(:disabled) {
+            transform: scale(0.9);
+        }
+
+        .send-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .quick-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+            justify-content: center;
+        }
+
+        .suggestion {
+            background: #ffffff;
+            border: 1px solid #000000;
+            color: #000000;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .suggestion:hover {
+            background: #000000;
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+
+        .welcome-message {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #666666;
+            font-size: 14px;
+        }
+
+        .stats {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #666666;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+        
+        .dashboard-link {
+            color: #666666;
+            text-decoration: none;
+            font-size: 12px;
+            background: rgba(0,0,0,0.05);
+            padding: 5px 10px;
+            border-radius: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .dashboard-link:hover {
+            background: rgba(0,0,0,0.1);
+            color: #000000;
+        }
+
+        .ai-badge {
+            display: inline-block;
+            background: #0066cc;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        @media (max-width: 600px) {
+            .chat-container {
+                padding: 10px;
+            }
+            
+            .message-content {
+                max-width: 85%;
+                font-size: 15px;
+                padding: 12px 16px;
+            }
+            
+            .header h1 {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Chatbot IA - Lugares de Huancayo <span class="ai-badge">GEMINI</span></h1>
+        <p>Asistente inteligente con IA real</p>
+    </div>
+
+    <div class="chat-container">
+        <div class="stats" id="stats">
+            <span id="stats-text">Cargando información...</span>
+            <a href="/dashboard" class="dashboard-link">📊 Dashboard</a>
+        </div>
+
+        <div class="quick-suggestions" id="suggestions">
+            <div class="suggestion" onclick="sendSuggestion('¿Cuántos lugares hay en Huancayo?')">Total lugares</div>
+            <div class="suggestion" onclick="sendSuggestion('Dime sobre lugares turísticos')">Turísticos</div>
+            <div class="suggestion" onclick="sendSuggestion('¿Dónde está el Parque Constitución?')">Parque Constitución</div>
+            <div class="suggestion" onclick="sendSuggestion('Lugares culturales')">Culturales</div>
+            <div class="suggestion" onclick="sendSuggestion('¿Qué me recomiendas visitar?')">Recomendaciones</div>
+        </div>
+
+        <div class="messages" id="messages">
+            <div class="welcome-message">
+                <strong>¡Hola! Soy tu asistente inteligente sobre lugares en Huancayo</strong><br>
+                Puedes preguntarme cualquier cosa sobre lugares turísticos, culturales, restaurantes, y más. 
+                Usaré mi inteligencia artificial para darte respuestas útiles y precisas.
+            </div>
+            <div class="message bot">
+                <div class="message-content">
+                    ¡Bienvenido! Estoy aquí para ayudarte a descubrir los mejores lugares de Huancayo. 
+                    Puedes preguntarme sobre cualquier lugar, desde parques hasta restaurantes, 
+                    y te daré información detallada y recomendaciones personalizadas.
+                    
+¿Qué te gustaría saber?
+                </div>
+            </div>
+        </div>
+
+        <div class="typing-indicator" id="typing">
+            <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            La IA está escribiendo...
+        </div>
+
+        <div class="input-container">
+            <button id="new-chat-button" class="new-chat-button">Nuevo Chat</button>
+            <input type="text" \
+                   class="message-input" \
+                   id="messageInput" \
+                   placeholder="Escribe tu pregunta sobre lugares en Huancayo..." \
+                   autocomplete="off">
+            <button class="send-button" id="sendButton" onclick="sendMessage()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const typingIndicator = document.getElementById('typing');
+
+        // Cargar estadísticas iniciales
+        fetch('/api/stats')
+            .then(response => response.json())
+            .then(data => {
+                if (data.estado === 'con_bd') {
+                    document.getElementById('stats-text').textContent = 
+                        `${data.total_lugares} lugares • ${data.categorias.length} categorías • IA activa`;
+                } else if (data.estado === 'modo_sin_bd') {
+                    document.getElementById('stats-text').textContent = 
+                        'IA activa • Modo sin base de datos';
+                } else {
+                    document.getElementById('stats-text').textContent = 
+                        'IA activa • Error en base de datos';
+                }
+            })
+            .catch(() => {
+                document.getElementById('stats-text').textContent = 'IA Gemini activa • Conectado a datos';
+            });
+
+        function addMessage(text, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = text.replace(/\n/g, '<br>');
+            
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+            
+            // Auto-scroll
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showTyping() {
+            typingIndicator.style.display = 'block';
+            // asegurar texto del indicador
+            const nodes = Array.from(typingIndicator.childNodes);
+            let textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE);
+            if (!textNode) {
+                textNode = document.createTextNode(' La IA está escribiendo...');
+                typingIndicator.appendChild(textNode);
+            } else {
+                textNode.textContent = ' La IA está escribiendo...';
+            }
+            sendButton.disabled = true;
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function hideTyping() {
+            typingIndicator.style.display = 'none';
+            // restablecer el texto para futuros usos
+            const nodes = Array.from(typingIndicator.childNodes);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE);
+            if (textNode) textNode.textContent = ' La IA está escribiendo...';
+            sendButton.disabled = false;
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // Agregar mensaje del usuario
+            addMessage(message, true);
+            messageInput.value = '';
+
+            // Mostrar indicador de escritura
+            showTyping();
+
+            try {
+                // Crear elemento para la respuesta del bot
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message bot';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentDiv.id = 'current-response';
+                contentDiv.innerHTML = ''; // Inicialmente vacío
+                
+                messageDiv.appendChild(contentDiv);
+                
+                // Ocultar el indicador de escritura y mostrar el mensaje vacío
+                hideTyping();
+                 messagesContainer.appendChild(messageDiv);
+                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                // Crear URL para el streaming con el mensaje codificado
+                const encodedMessage = encodeURIComponent(message);
+                const streamUrl = `/api/chat?_=${Date.now()}`;
+                
+                // Enviar mensaje usando fetch para iniciar el streaming
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message, stream: true })
+                });
+                
+                // Usar la respuesta directamente como fuente de eventos
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                // Función para leer los chunks optimizada
+                async function readStream() {
+                    try {
+                        let buffer = '';
+                        let fullResponse = '';
+                        
+                        while (true) {
+                            const {value, done} = await reader.read();
+                            
+                            if (done) break;
+                            
+                            buffer += decoder.decode(value, {stream: true});
+                            
+                            // Procesar solo cuando tenemos líneas completas
+                            const lines = buffer.split('\n\n');
+                            buffer = lines.pop() || ''; // Mantener última línea incompleta
+                            
+                            for (const line of lines) {
+                                if (line.startsWith('data: ')) {
+                                    try {
+                                        const data = JSON.parse(line.substring(6));
+                                        
+                                        if (data.chunk) {
+                                            // Acumular el texto completo
+                                            fullResponse += data.chunk;
+                                            // Mostrar el texto acumulado
+                                            contentDiv.innerHTML = formatResponse(fullResponse);
+                                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                                        }
+                                        
+                                        if (data.done) {
+                                            // Aplicar formato final a la respuesta completa
+                                            contentDiv.innerHTML = formatResponse(fullResponse);
+                                            hideTyping();
+                                            return;
+                                        }
+                                    } catch (parseError) {
+                                        console.warn('Error parseando JSON:', parseError);
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error leyendo stream:', error);
+                        if (contentDiv.innerHTML === '') {
+                            contentDiv.innerHTML = 'Lo siento, hubo un error al procesar tu pregunta.';
+                        }
+                        hideTyping();
+                    }
+                }
+                
+                // Función para formatear la respuesta con mejor presentación
+                function formatResponse(text) {
+                    if (!text) return text;
+                    
+                    // Primero manejar los saltos de línea dobles para crear párrafos
+                    let result = text;
+                    
+                    // Convertir saltos de línea dobles en párrafos separados
+                    const paragraphs = result.split('\n\n');
+                    let formattedParagraphs = [];
+                    
+                    for (let para of paragraphs) {
+                        if (para.trim() === '') continue;
+                        
+                        // Manejar listas dentro de cada párrafo
+                        const lines = para.split('\n');
+                        let paraResult = '';
+                        let inList = false;
+                        
+                        for (let i = 0; i < lines.length; i++) {
+                            let line = lines[i].trim();
+                            
+                            // Detectar líneas de lista
+                            if (line.match(/^\s*[*\-]\s+/)) {
+                                if (!inList) {
+                                    paraResult += '<ul>';
+                                    inList = true;
+                                }
+                                const content = line.replace(/^\s*[*\-]\s+/, '');
+                                // Aplicar negritas dentro del contenido
+                                const formattedContent = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                                paraResult += `<li>${formattedContent}</li>`;
+                            } else {
+                                if (inList) {
+                                    paraResult += '</ul>';
+                                    inList = false;
+                                }
+                                
+                                // Aplicar negritas a texto entre asteriscos dobles
+                                line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                                
+                                // Manejar títulos
+                                if (line.match(/^###\s+/)) {
+                                    const content = line.replace(/^###\s+/, '');
+                                    paraResult += `<h4>${content}</h4>`;
+                                } else if (line.match(/^##\s+/)) {
+                                    const content = line.replace(/^##\s+/, '');
+                                    paraResult += `<h3>${content}</h3>`;
+                                } else if (line.match(/^#\s+/)) {
+                                    const content = line.replace(/^#\s+/, '');
+                                    paraResult += `<h2>${content}</h2>`;
+                                } else if (line.trim() !== '') {
+                                    paraResult += line;
+                                }
+                            }
+                        }
+                        
+                        if (inList) {
+                            paraResult += '</ul>';
+                        }
+                        
+                        if (paraResult.trim() !== '') {
+                            formattedParagraphs.push(paraResult);
+                        }
+                    }
+                    
+                    // Unir párrafos con espacio entre ellos
+                    return formattedParagraphs.join('<br><br>');
+                }
+                
+                // Iniciar la lectura del stream
+                 readStream();
+            } catch (error) {
+                hideTyping();
+                addMessage('Lo siento, hubo un error al conectar con el servicio de IA. Por favor, intenta de nuevo.');
+                console.error('Error:', error);
+            }
+        }
+
+        function sendSuggestion(text) {
+            messageInput.value = text;
+            sendMessage();
+        }
+
+        // Event listeners
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Listener for new chat button
+        const newChatButton = document.getElementById('new-chat-button');
+        newChatButton.addEventListener('click', () => {
+            fetch('/api/dashboard/clear-cache', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    messagesContainer.innerHTML = '';
+                    addMessage('¡Bienvenido a un nuevo chat! ¿En qué puedo ayudarte sobre Huancayo?', false);
+                } else {
+                    alert('Error al limpiar caché');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al conectar con el servidor');
+            });
+        });
+
+        // Enfocar el input al cargar
+        messageInput.focus();
+    </script>
+</body>
+</html>
