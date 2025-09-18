@@ -468,6 +468,15 @@
             showTyping();
 
             try {
+                // Enviar mensaje usando fetch para iniciar el streaming
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message, stream: true })
+                });
+                
                 // Crear elemento para la respuesta del bot
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message bot';
@@ -479,23 +488,9 @@
                 
                 messageDiv.appendChild(contentDiv);
                 
-                // Ocultar el indicador de escritura y mostrar el mensaje vacío
-                hideTyping();
-                 messagesContainer.appendChild(messageDiv);
-                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                
-                // Crear URL para el streaming con el mensaje codificado
-                const encodedMessage = encodeURIComponent(message);
-                const streamUrl = `/api/chat?_=${Date.now()}`;
-                
-                // Enviar mensaje usando fetch para iniciar el streaming
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ message: message, stream: true })
-                });
+                // Mantener el indicador de escritura visible hasta que comience a llegar la respuesta
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 
                 // Usar la respuesta directamente como fuente de eventos
                 const reader = response.body.getReader();
