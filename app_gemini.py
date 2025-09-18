@@ -194,12 +194,15 @@ def add_to_conversation(user_id, message, is_user):
         conversation_memory[user_id] = conversation_memory[user_id][-MAX_CONVERSATION_LENGTH:]
 
 def format_response(text):
-    """Formatea la respuesta con mejor presentación visual"""
+    """Formatea la respuesta con mejor presentación visual, incluyendo imágenes"""
     if not text:
         return text
     
     # Reemplazar asteriscos por negritas HTML
     import re
+    
+    # Convertir imágenes Markdown (![alt](url)) a etiquetas HTML img
+    text = re.sub(r'!\[([^\]]*)\]\(([^\)]+)\)', r'<img src="\2" alt="\1" style="max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">', text)
     
     # Manejar listas con viñetas
     # Convertir líneas que comienzan con * o - en listas HTML
@@ -216,6 +219,8 @@ def format_response(text):
             content = re.sub(r'^\s*[*\-]\s+', '', line)
             # Aplicar negritas dentro del contenido de la lista
             content = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content)
+            # Procesar imágenes dentro de listas
+            content = re.sub(r'!\[([^\]]*)\]\(([^\)]+)\)', r'<img src="\2" alt="\1" style="max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">', content)
             formatted_lines.append(f'<li>{content}</li>')
         else:
             if in_list:
@@ -224,6 +229,9 @@ def format_response(text):
             
             # Aplicar negritas a texto entre asteriscos dobles
             line = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', line)
+            
+            # Procesar imágenes en líneas normales
+            line = re.sub(r'!\[([^\]]*)\]\(([^\)]+)\)', r'<img src="\2" alt="\1" style="max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">', line)
             
             # Manejar títulos con ### o ## al inicio
             if re.match(r'^###\s+', line):
@@ -317,12 +325,39 @@ def get_database_context():
             conn = get_db_connection()
             if conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM locacion_imagenes")
-                total_imagenes = cursor.fetchone()[0]
-                if total_imagenes > 0:
-                    context += f"\nIMÁGENES DISPONIBLES: {total_imagenes} imágenes asociadas a lugares."
+                
+                # Obtener información detallada de imágenes por lugar
+                cursor.execute("""
+                    SELECT l.nombre, li.url_imagen, li.descripcion 
+                    FROM locacion_imagenes li
+                    JOIN locaciones l ON li.locacion_id = l.id
+                    ORDER BY l.nombre
+                """)
+                imagenes = cursor.fetchall()
+                
+                if imagenes:
+                    context += f"\nIMÁGENES DISPONIBLES: {len(imagenes)} imágenes asociadas a lugares.\n"
+                    
+                    # Agrupar imágenes por lugar
+                    imagenes_por_lugar = {}
+                    for nombre, url_imagen, descripcion in imagenes:
+                        if nombre not in imagenes_por_lugar:
+                            imagenes_por_lugar[nombre] = []
+                        imagenes_por_lugar[nombre].append({
+                            'url': url_imagen,
+                            'descripcion': descripcion or 'Imagen del lugar'
+                        })
+                    
+                    # Agregar información de imágenes al contexto
+                    for lugar, imgs in imagenes_por_lugar.items():
+                        context += f"IMAGENES_{lugar.upper().replace(' ', '_')}: "
+                        for img in imgs:
+                            context += f"[URL: {img['url']}, DESC: {img['descripcion']}] "
+                        context += "\n"
+                
                 conn.close()
-        except:
+        except Exception as e:
+            print(f"Error al obtener imágenes: {e}")
             pass  # Si hay error con las imágenes, continuar sin ellas
         
         # Guardar en caché
@@ -555,6 +590,14 @@ INSTRUCCIONES CRÍTICAS - LEER Y SEGUIR EXACTAMENTE:
 7. **NO MENCIONAR** problemas de conexión, bases de datos, problemas técnicos o limitaciones de acceso a datos
 8. **ASUMIR** que tienes acceso completo y perfecto a toda la información del contexto
 
+INSTRUCCIONES PARA INCLUIR IMÁGENES:
+- Cuando menciones un lugar que tenga imágenes disponibles, SIEMPRE incluye las URLs de las imágenes
+- Busca en el contexto las líneas que empiezan con "IMAGENES_" para encontrar las URLs de cada lugar
+- Formato para imágenes: Usa ![descripción](URL) para insertar imágenes
+- Si hay múltiples imágenes, crea una galería mostrando 2-3 imágenes principales
+- Las imágenes deben aparecer después de la descripción del lugar
+- Ejemplo: Para el Parque Constitución, busca "IMAGENES_PARQUE_CONSTITUCION:" en el contexto y usa esas URLs
+
 INSTRUCCIONES DE FORMATO:
 - Usa **negritas** para resaltar lugares importantes y categorías
 - Organiza la información en párrafos separados (presiona ENTER dos veces)
@@ -564,6 +607,7 @@ INSTRUCCIONES DE FORMATO:
 - NO uses \\n ni caracteres de escape, usa saltos de línea reales
 - IMPORTANTE: Cada nombre de lugar que menciones DEBE ir exactamente entre [[ y ]], por ejemplo: [[Cerrito de la Libertad]]. SOLO puedes encerrar entre [[ ]] nombres de lugares que existan en el contexto.
 - Si el usuario pregunta por un lugar que no aparece en el contexto, responde claramente que NO hay información al respecto y no inventes nada.
+- Cuando incluyas imágenes, usa el formato Markdown: ![descripción de la imagen](URL_de_la_imagen)
 
 RESPONDE ÚNICAMENTE BASÁNDOTE EN LOS DATOS REALES DEL CONTEXTO. IMPORTANTE: NO MENCIONES PROBLEMAS TÉCNICOS NI DE CONEXIÓN."""
 

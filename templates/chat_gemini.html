@@ -122,6 +122,83 @@
             line-height: 1.5;
         }
 
+        .message-content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 10px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: block;
+        }
+
+        .message-content img:hover {
+            transform: scale(1.02);
+            transition: transform 0.3s ease;
+        }
+
+        /* Estilos para tarjetas de imagen (estilo WhatsApp/Instagram) */
+        .image-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 12px 0;
+            overflow: hidden;
+            max-width: 320px;
+            display: inline-block;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .image-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        .image-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            overflow: hidden;
+        }
+
+        .image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 0;
+            margin: 0;
+            display: block;
+            transition: transform 0.3s ease;
+        }
+
+        .image-container:hover img {
+            transform: scale(1.05);
+        }
+
+        .image-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.6));
+            padding: 20px 12px 12px;
+            color: white;
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.3;
+        }
+
+        /* Responsive para tarjetas de imagen */
+        @media (max-width: 600px) {
+            .image-card {
+                max-width: 280px;
+            }
+            
+            .image-container {
+                height: 180px;
+            }
+        }
+
         .message-content p {
             margin: 10px 0;
             line-height: 1.6;
@@ -546,7 +623,7 @@
                     }
                 }
                 
-                // Función para formatear la respuesta con mejor presentación
+                // Función para formatear la respuesta con mejor presentación (estilo apps de mensajería)
                 function formatResponse(text) {
                     if (!text) return text;
                     
@@ -567,6 +644,49 @@
                         
                         for (let i = 0; i < lines.length; i++) {
                             let line = lines[i].trim();
+                            
+                            // Procesar imágenes en formato Markdown: ![alt text](url)
+                            line = line.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function(match, alt, url) {
+                                // Crear tarjeta visual para la imagen (estilo WhatsApp/Instagram)
+                                return `
+                                    <div class="image-card" style="
+                                        background: white;
+                                        border-radius: 12px;
+                                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                                        margin: 12px 0;
+                                        overflow: hidden;
+                                        max-width: 320px;
+                                        display: inline-block;
+                                    ">
+                                        <div class="image-container" style="
+                                            position: relative;
+                                            width: 100%;
+                                            height: 200px;
+                                            overflow: hidden;
+                                        ">
+                                            <img src="${url}" alt="${alt}" title="${alt}" style="
+                                                width: 100%;
+                                                height: 100%;
+                                                object-fit: cover;
+                                                border-radius: 0;
+                                                margin: 0;
+                                                display: block;
+                                            ">
+                                            <div class="image-overlay" style="
+                                                position: absolute;
+                                                bottom: 0;
+                                                left: 0;
+                                                right: 0;
+                                                background: linear-gradient(transparent, rgba(0,0,0,0.6));
+                                                padding: 20px 12px 12px;
+                                                color: white;
+                                                font-size: 12px;
+                                                font-weight: 500;
+                                            ">${alt}</div>
+                                        </div>
+                                    </div>
+                                `;
+                            });
                             
                             // Detectar líneas de lista
                             if (line.match(/^\s*[*\-]\s+/)) {
@@ -664,6 +784,89 @@
 
         // Enfocar el input al cargar
         messageInput.focus();
+
+        // Función para abrir imagen en modal (estilo WhatsApp/Instagram)
+        function openImageModal(imageSrc, imageAlt) {
+            // Crear modal si no existe
+            let modal = document.getElementById('image-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'image-modal';
+                modal.innerHTML = `
+                    <div class="modal-overlay" style="
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(0,0,0,0.9);
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        z-index: 1000;
+                        cursor: pointer;
+                    ">
+                        <div class="modal-content" style="
+                            position: relative;
+                            max-width: 90vw;
+                            max-height: 90vh;
+                            background: transparent;
+                        ">
+                            <img id="modal-image" style="
+                                max-width: 100%;
+                                max-height: 90vh;
+                                object-fit: contain;
+                                border-radius: 8px;
+                            ">
+                            <div class="modal-caption" style="
+                                position: absolute;
+                                bottom: -40px;
+                                left: 0;
+                                right: 0;
+                                color: white;
+                                text-align: center;
+                                font-size: 14px;
+                                padding: 10px;
+                            "></div>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                
+                // Cerrar modal al hacer clic
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal || e.target.classList.contains('modal-overlay')) {
+                        modal.style.display = 'none';
+                    }
+                });
+            }
+            
+            // Configurar imagen y mostrar modal
+            const modalImage = document.getElementById('modal-image');
+            const modalCaption = modal.querySelector('.modal-caption');
+            modalImage.src = imageSrc;
+            modalCaption.textContent = imageAlt;
+            modal.style.display = 'flex';
+            
+            // Cerrar con tecla ESC
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    modal.style.display = 'none';
+                }
+            });
+        }
+
+        // Agregar event listeners a las tarjetas de imagen (delegación de eventos)
+        document.addEventListener('click', function(e) {
+            // Buscar la tarjeta de imagen más cercana
+            const imageCard = e.target.closest('.image-card');
+            if (imageCard) {
+                const img = imageCard.querySelector('img');
+                if (img) {
+                    openImageModal(img.src, img.alt);
+                }
+            }
+        });
     </script>
 </body>
 </html>
