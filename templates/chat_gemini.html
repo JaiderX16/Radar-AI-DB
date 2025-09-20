@@ -186,7 +186,7 @@
                 <!-- LUGARES DESTACADOS - NUEVA SECCIÓN EN PANTALLA PRINCIPAL -->
                 <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
                     <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-semibold text-gray-800">
+                        <h3 id="places-title" class="text-lg font-semibold text-gray-800">
                             <i class="fas fa-map-marker-alt mr-2 text-green-500"></i>Lugares Destacados en Huancayo
                         </h3>
                     </div>
@@ -434,8 +434,22 @@
                         }
                     }
                     
+                    // Mostrar directamente los lugares filtrados que vienen en la respuesta
                     if (data.places && data.places.length > 0) {
                         renderPlaces(data.places);
+                        
+                        // Si se detectó un nombre de lugar específico, actualizar la UI para reflejarlo
+                        if (data.place_name) {
+                            document.getElementById('places-title').textContent = 'Lugar encontrado: ' + data.place_name;
+                        } 
+                        // Si hay lugares mencionados en la respuesta de la IA
+                        else if (data.lugares_mencionados && data.lugares_mencionados.length > 0) {
+                            if (data.lugares_mencionados.length === 1) {
+                                document.getElementById('places-title').textContent = 'Lugar mencionado: ' + data.lugares_mencionados[0];
+                            } else {
+                                document.getElementById('places-title').textContent = 'Lugares mencionados: ' + data.lugares_mencionados.join(', ');
+                            }
+                        }
                     }
                     
                     if (data.response) {

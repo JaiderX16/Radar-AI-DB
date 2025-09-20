@@ -266,13 +266,13 @@ def format_response(text):
     
     return result
 
-def get_database_context(category=None):
+def get_database_context(category=None, place_name=None):
     """Obtener TODA la información real de la base de datos MySQL con caché"""
     global context_cache, cache_timestamp
     
-    # Verificar si el caché es válido
+    # No usar caché cuando se filtra por nombre específico
     import time
-    if context_cache and cache_timestamp and (time.time() - cache_timestamp) < CACHE_DURATION:
+    if not place_name and context_cache and cache_timestamp and (time.time() - cache_timestamp) < CACHE_DURATION:
         return context_cache
     
     try:
@@ -551,6 +551,105 @@ def detect_category_intent(text: str) -> str | None:
             return cat
     return None
 
+def detect_place_name(text: str) -> str | None:
+    """
+    Detecta si el usuario menciona un nombre específico de lugar.
+    Devuelve el nombre del lugar o None si no se detecta ninguno.
+    """
+    if not text:
+        return None
+    
+    # Lista de lugares conocidos en Huancayo
+    lugares_conocidos = [
+        "Plaza Constitución", "Plaza Huamanmarca", "Parque de la Identidad", 
+        "Cerrito de la Libertad", "Parque Inmaculada", "Torre Torre",
+        "Real Plaza", "Open Plaza", "Mall Center", "Plaza Vea",
+        "Catedral de Huancayo", "Feria Dominical", "Nevado Huaytapallana",
+        "Wariwillka", "Estadio Huancayo"
+    ]
+    
+    # Normalizar texto
+    t = text.lower()
+    
+    # Buscar menciones de lugares conocidos
+    for lugar in lugares_conocidos:
+        lugar_lower = lugar.lower()
+        # Verificar si el nombre del lugar está en el texto como palabra completa
+        if lugar_lower in t:
+            # Verificar si es una palabra completa o parte de otra palabra
+            # Buscar el índice donde aparece el lugar
+            idx = t.find(lugar_lower)
+            # Verificar si es una palabra completa (está al inicio, al final, o rodeada de espacios)
+            if (idx == 0 or not t[idx-1].isalnum()) and (idx + len(lugar_lower) == len(t) or not t[idx + len(lugar_lower)].isalnum()):
+                return lugar
+    
+    return None
+
+def extract_places_from_response(response_text: str) -> list:
+    """
+    Extrae nombres de lugares mencionados en la respuesta de la IA.
+    Devuelve una lista de nombres de lugares encontrados.
+    """
+    if not response_text:
+        return []
+    
+    # Lista de lugares conocidos en Huancayo
+    lugares_conocidos = [
+        "Plaza Constitución", "Plaza Huamanmarca", "Parque de la Identidad", 
+        "Cerrito de la Libertad", "Parque Inmaculada", "Torre Torre",
+        "Real Plaza", "Open Plaza", "Mall Center", "Plaza Vea",
+        "Catedral de Huancayo", "Feria Dominical", "Nevado Huaytapallana",
+        "Wariwillka", "Estadio Huancayo"
+    ]
+    
+    # Obtener todos los lugares de la base de datos para una detección más completa
+    try:
+        conn = get_db_connection()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT nombre FROM locaciones")
+            lugares_db = cursor.fetchall()
+            conn.close()
+            
+            # Agregar lugares de la base de datos a la lista de lugares conocidos
+            for lugar_db in lugares_db:
+                if lugar_db[0] and lugar_db[0] not in lugares_conocidos:
+                    lugares_conocidos.append(lugar_db[0])
+    except Exception as e:
+        print(f"Error al obtener lugares de la base de datos: {str(e)}")
+    
+    # Normalizar texto
+    t = response_text.lower()
+    
+    # Lista para almacenar los lugares encontrados
+    lugares_encontrados = []
+    
+    # Buscar menciones de lugares conocidos
+    for lugar in lugares_conocidos:
+        lugar_lower = lugar.lower()
+        # Verificar si el nombre del lugar está en el texto como palabra completa
+        if lugar_lower in t:
+            # Verificar si es una palabra completa o parte de otra palabra
+            # Buscar todas las ocurrencias del lugar
+            start_idx = 0
+            while True:
+                idx = t.find(lugar_lower, start_idx)
+                if idx == -1:
+                    break
+                    
+                # Verificar si es una palabra completa (está al inicio, al final, o rodeada de espacios o puntuación)
+                is_word_boundary_before = (idx == 0 or not t[idx-1].isalnum())
+                is_word_boundary_after = (idx + len(lugar_lower) == len(t) or not t[idx + len(lugar_lower)].isalnum())
+                
+                if is_word_boundary_before and is_word_boundary_after:
+                    if lugar not in lugares_encontrados:
+                        lugares_encontrados.append(lugar)
+                        break  # Una vez encontrado, no necesitamos más ocurrencias del mismo lugar
+                
+                start_idx = idx + 1
+    
+    return lugares_encontrados
+
 
 
 @app.route('/api/chat', methods=['POST'])
@@ -565,6 +664,11 @@ def chat():
     # Detectar intenciones si no se proporcionan explícitamente o si se solicita filtrado automático
     if category is None or auto_filter:
         category = detect_category_intent(user_message)
+    
+    # Detectar nombre de lugar si se solicita filtrado automático
+    place_name = None
+    if auto_filter:
+        place_name = detect_place_name(user_message)
     
     # Obtener ID del usuario
     user_id = get_user_id()
@@ -596,12 +700,34 @@ def chat():
                 for word in words:
                     json_data = json.dumps({'chunk': word + ' ', 'done': False})
                     yield f"data: {json_data}\n\n"
-                places = get_places_filtered(category)
-                yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category})}\n\n"
+                # Extraer lugares mencionados en la respuesta
+                lugares_mencionados = extract_places_from_response(simple_response)
+                
+                # Si se encontraron lugares en la respuesta, usarlos directamente para filtrar
+                if lugares_mencionados:
+                    places = get_places_filtered(category, None, lugares_mencionados)
+                    # Usar el primer lugar mencionado como place_name para la UI
+                    place_name = lugares_mencionados[0] if not place_name else place_name
+                else:
+                    # Si no hay lugares mencionados, usar el filtrado normal
+                    places = get_places_filtered(category, place_name)
+                
+                yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category, 'place_name': place_name, 'lugares_mencionados': lugares_mencionados})}\n\n"
             return Response(generate_simple(), mimetype='text/event-stream')
         else:
-            places = get_places_filtered(category)
-        return jsonify({'response': simple_response, 'places': places, 'category': category})
+            # Extraer lugares mencionados en la respuesta
+            lugares_mencionados = extract_places_from_response(simple_response)
+            
+            # Si se encontraron lugares en la respuesta, usarlos directamente para filtrar
+            if lugares_mencionados:
+                places = get_places_filtered(category, None, lugares_mencionados)
+                # Usar el primer lugar mencionado como place_name para la UI
+                place_name = lugares_mencionados[0] if not place_name else place_name
+            else:
+                # Si no hay lugares mencionados, usar el filtrado normal
+                places = get_places_filtered(category, place_name)
+                
+            return jsonify({'response': simple_response, 'places': places, 'category': category, 'place_name': place_name, 'lugares_mencionados': lugares_mencionados})
     
     # Verificar si tenemos una respuesta en caché
     cached_response = get_cached_response(user_message)
@@ -615,6 +741,9 @@ def chat():
         add_to_conversation(user_id, user_message, True)
         add_to_conversation(user_id, cached_response, False)
         
+        # Extraer lugares mencionados en la respuesta en caché
+        lugares_mencionados = extract_places_from_response(cached_response)
+        
         if stream_mode:
             # Devolver respuesta en caché en modo streaming
             def generate_cached():
@@ -622,12 +751,31 @@ def chat():
                 for chunk in chunks:
                     json_data = json.dumps({'chunk': chunk + ' ', 'done': False})
                     yield f"data: {json_data}\n\n"
-                places = get_places_filtered(category)
-                yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category})}\n\n"
+                    
+                # Si se encontraron lugares en la respuesta, usarlos directamente para filtrar
+                if lugares_mencionados:
+                    places = get_places_filtered(category, None, lugares_mencionados)
+                    # Usar el primer lugar mencionado como place_name para la UI
+                    place_name_final = lugares_mencionados[0] if not place_name else place_name
+                else:
+                    # Si no hay lugares mencionados, usar el filtrado normal
+                    places = get_places_filtered(category, place_name)
+                    place_name_final = place_name
+                    
+                yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category, 'place_name': place_name_final, 'lugares_mencionados': lugares_mencionados})}\n\n"
             return Response(generate_cached(), mimetype='text/event-stream')
         else:
-            places = get_places_filtered(category)
-            return jsonify({'response': cached_response, 'places': places, 'category': category})
+            # Si se encontraron lugares en la respuesta, usarlos directamente para filtrar
+            if lugares_mencionados:
+                places = get_places_filtered(category, None, lugares_mencionados)
+                # Usar el primer lugar mencionado como place_name para la UI
+                place_name_final = lugares_mencionados[0] if not place_name else place_name
+            else:
+                # Si no hay lugares mencionados, usar el filtrado normal
+                places = get_places_filtered(category, place_name)
+                place_name_final = place_name
+                
+            return jsonify({'response': cached_response, 'places': places, 'category': category, 'place_name': place_name_final, 'lugares_mencionados': lugares_mencionados})
     
     # Detectar si el usuario quiere ver todos los lugares
     mostrar_todos = False
@@ -636,7 +784,7 @@ def chat():
         category = None  # Eliminar filtro de categoría
     
     # Obtener contexto real de la base de datos y conversación (con filtros)
-    db_context = get_database_context(category)
+    db_context = get_database_context(category, place_name)
     conversation_context = get_conversation_context(user_id)
     
     # Extraer lugares reales del contexto para validación
@@ -706,12 +854,12 @@ def chat():
                 for chunk in safe_msg.split():
                     json_data = json.dumps({'chunk': chunk + ' ', 'done': False})
                     yield f"data: {json_data}\n\n"
-                places = get_places_filtered(category)
-                yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category})}\n\n"
+                places = get_places_filtered(category, place_name)
+                yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category, 'place_name': place_name})}\n\n"
             return Response(generate_no_data(), mimetype='text/event-stream')
         else:
-            places = get_places_filtered(category)
-        return jsonify({'response': safe_msg, 'places': places, 'category': category})
+            places = get_places_filtered(category, place_name)
+            return jsonify({'response': safe_msg, 'places': places, 'category': category, 'place_name': place_name})
 
     # Crear prompt con contexto de conversación - MUY IMPORTANTE: USAR SOLO DATOS REALES
     prompt = f"""CONTEXTO DE BASE DE DATOS HUANCAYO (USAR SOLO ESTA INFORMACIÓN):
@@ -783,11 +931,23 @@ RESPONDE ÚNICAMENTE BASÁNDOTE EN LOS DATOS REALES DEL CONTEXTO. IMPORTANTE: NO
                     # Validar que la respuesta use solo datos reales
                     respuesta_validada = validar_respuesta_real(formatted_response, lugares_reales)
                     
+                    # Extraer lugares mencionados en la respuesta
+                    lugares_mencionados = extract_places_from_response(respuesta_validada)
+                    
                     cache_response(user_message, respuesta_validada)
                     add_to_conversation(user_id, user_message, True)
                     add_to_conversation(user_id, respuesta_validada, False)
-                    places = get_places_filtered(category)
-                    yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category})}\n\n"
+                    
+                    # Si se encontraron lugares en la respuesta, usarlos directamente para filtrar
+                    if lugares_mencionados:
+                        places = get_places_filtered(category, None, lugares_mencionados)
+                        # Usar el primer lugar mencionado como place_name para la UI
+                        place_name = lugares_mencionados[0] if not place_name else place_name
+                    else:
+                        # Si no hay lugares mencionados, usar el filtrado normal
+                        places = get_places_filtered(category, place_name)
+                        
+                    yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category, 'place_name': place_name, 'lugares_mencionados': lugares_mencionados})}\n\n"
                 except Exception as e:
                     error_msg = f"Error: {str(e)}"
                     if "quota" in str(e).lower() or "429" in str(e):
@@ -805,13 +965,25 @@ RESPONDE ÚNICAMENTE BASÁNDOTE EN LOS DATOS REALES DEL CONTEXTO. IMPORTANTE: NO
             # Validar que la respuesta use solo datos reales
             respuesta_validada = validar_respuesta_real(response.text, lugares_reales)
             
+            # Extraer lugares mencionados en la respuesta
+            lugares_mencionados = extract_places_from_response(respuesta_validada)
+            
             cache_response(user_message, respuesta_validada)
             
             # Guardar en memoria conversacional
             add_to_conversation(user_id, user_message, True)
             add_to_conversation(user_id, respuesta_validada, False)
-            places = get_places_filtered(category)
-            return jsonify({'response': respuesta_validada, 'places': places, 'category': category})
+            
+            # Si se encontraron lugares en la respuesta, usarlos directamente para filtrar
+            if lugares_mencionados:
+                places = get_places_filtered(category, None, lugares_mencionados)
+                # Usar el primer lugar mencionado como place_name para la UI
+                place_name = lugares_mencionados[0] if not place_name else place_name
+            else:
+                # Si no hay lugares mencionados, usar el filtrado normal
+                places = get_places_filtered(category, place_name)
+                
+            return jsonify({'response': respuesta_validada, 'places': places, 'category': category, 'place_name': place_name, 'lugares_mencionados': lugares_mencionados})
     except Exception as e:
         error_msg = f'Error al procesar la consulta: {str(e)}'
         if "quota" in str(e).lower() or "429" in str(e):
@@ -825,30 +997,65 @@ RESPONDE ÚNICAMENTE BASÁNDOTE EN LOS DATOS REALES DEL CONTEXTO. IMPORTANTE: NO
         places = []
         return jsonify({'response': error_msg, 'places': places})
 
-def get_places_filtered(category=None):
-    """Obtener lugares filtrados por categoría"""
+def get_places_filtered(category=None, place_name=None, lugares_mencionados=None):
+    """Obtener lugares filtrados por categoría, nombre o lista de lugares mencionados"""
     conn = get_db_connection()
     if not conn:
         return []
     
     cursor = conn.cursor()
     
-    # Construir la consulta base
-    base_query = "SELECT nombre, descripcion, latitud, longitud, categoria FROM locaciones WHERE 1=1"
-    params = []
-    
-    # Agregar filtro de categoría si existe
-    if category:
-        base_query += " AND categoria LIKE %s"
-        params.append(f"%{category}%")
-    
-
-    
-    # Ejecutar la consulta
-    if params:
-        cursor.execute(base_query, params)
+    # Si tenemos lugares mencionados, usamos esos directamente con búsqueda mejorada
+    if lugares_mencionados and isinstance(lugares_mencionados, list) and len(lugares_mencionados) > 0:
+        # Construir consulta para múltiples lugares usando LIKE para cada lugar
+        # con coincidencias más precisas
+        conditions = []
+        params = []
+        
+        for lugar in lugares_mencionados:
+            # Buscar coincidencias exactas primero (prioridad alta)
+            conditions.append("(nombre = %s OR nombre LIKE %s OR nombre LIKE %s OR nombre LIKE %s)")
+            params.extend([lugar, f"{lugar}%", f"% {lugar}", f"%{lugar}%"])
+        
+        # Unir condiciones con OR
+        where_clause = " OR ".join(conditions)
+        query = f"SELECT nombre, descripcion, latitud, longitud, categoria FROM locaciones WHERE {where_clause}"
+        
+        # Agregar filtro de categoría si existe
+        if category:
+            query += " AND categoria LIKE %s"
+            params.append(f"%{category}%")
+            
+        # Ordenar por relevancia (coincidencia exacta primero)
+        query += " ORDER BY CASE WHEN nombre IN ("
+        query += ", ".join(["%s"] * len(lugares_mencionados))
+        query += ") THEN 0 ELSE 1 END, nombre"
+        params.extend(lugares_mencionados)
+        
+        cursor.execute(query, params)
     else:
-        cursor.execute(base_query.replace("WHERE 1=1", ""))
+        # Construir la consulta base (comportamiento original mejorado)
+        base_query = "SELECT nombre, descripcion, latitud, longitud, categoria FROM locaciones WHERE 1=1"
+        params = []
+        
+        # Agregar filtro de categoría si existe
+        if category:
+            base_query += " AND categoria LIKE %s"
+            params.append(f"%{category}%")
+        
+        # Agregar filtro de nombre si existe con búsqueda mejorada
+        if place_name:
+            base_query += " AND (nombre = %s OR nombre LIKE %s OR nombre LIKE %s OR nombre LIKE %s)"
+            params.extend([place_name, f"{place_name}%", f"% {place_name}", f"%{place_name}%"])
+            # Ordenar por relevancia (coincidencia exacta primero)
+            base_query += " ORDER BY CASE WHEN nombre = %s THEN 0 ELSE 1 END, nombre"
+            params.append(place_name)
+        
+        # Ejecutar la consulta
+        if params:
+            cursor.execute(base_query, params)
+        else:
+            cursor.execute(base_query.replace("WHERE 1=1", ""))
     
     lugares = cursor.fetchall()
     places = []
