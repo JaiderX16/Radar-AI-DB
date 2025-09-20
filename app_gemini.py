@@ -58,6 +58,17 @@ def get_db_connection():
         print(f"Error al conectar a MySQL: {e}")
         return None
 
+def check_database_connection():
+    """Verificar si hay conexión activa a MySQL"""
+    try:
+        conn = get_db_connection()
+        if conn:
+            conn.close()
+            return True
+        return False
+    except:
+        return False
+
 def get_db_connection_with_fallback():
     """Solo conectar a MySQL, sin fallback a SQLite"""
     # Solo intentar MySQL
@@ -255,7 +266,7 @@ def format_response(text):
     
     return result
 
-def get_database_context():
+def get_database_context(category=None):
     """Obtener TODA la información real de la base de datos MySQL con caché"""
     global context_cache, cache_timestamp
     
@@ -274,8 +285,32 @@ def get_database_context():
             
         cursor = conn.cursor()
         
-        # Obtener TODOS los datos de todas las columnas
-        cursor.execute("SELECT * FROM locaciones ORDER BY nombre")
+        # Construir consulta con filtros
+        query = "SELECT * FROM locaciones"
+        params = []
+        conditions = []
+        
+        if category:
+            # Mapear categorías en español
+            category_map = {
+                'parques': 'parque',
+                'plazas': 'plaza',
+                'miradores': 'mirador',
+                'centros-comerciales': 'centro comercial'
+            }
+            
+            category_es = category_map.get(category, category)
+            conditions.append("(LOWER(categoria) LIKE LOWER(%s) OR LOWER(nombre) LIKE LOWER(%s))")
+            params.extend([f'%{category_es}%', f'%{category_es}%'])
+        
+
+        
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+        
+        query += " ORDER BY nombre"
+        
+        cursor.execute(query, params)
         lugares = cursor.fetchall()
         
         # Obtener información de las columnas para entender la estructura
@@ -292,14 +327,22 @@ def get_database_context():
             for lugar in lugares:
                 # Construir información completa de cada lugar
                 info_lugar = []
+                nombre_lugar = None
                 
-                # Procesar cada columna
+                # Primero extraer el nombre para usarlo como referencia
+                for i, valor in enumerate(lugar):
+                    if valor is not None and nombres_columnas[i] == 'nombre':
+                        nombre_lugar = valor
+                        info_lugar.append(f"LUGAR: {valor}")
+                        break
+                
+                # Luego procesar el resto de columnas
                 for i, valor in enumerate(lugar):
                     if valor is not None:  # Solo incluir datos no nulos
                         nombre_columna = nombres_columnas[i]
                         
                         if nombre_columna == 'nombre':
-                            info_lugar.append(f"LUGAR: {valor}")
+                            continue  # Ya procesado arriba
                         elif nombre_columna == 'descripcion':
                             info_lugar.append(f"DESCRIPCIÓN: {valor}")
                         elif nombre_columna == 'latitud':
@@ -310,15 +353,21 @@ def get_database_context():
                         elif nombre_columna == 'longitud':
                             # Ya procesado con latitud
                             continue
+                        elif nombre_columna == 'categoria':
+                            info_lugar.append(f"CATEGORÍA: {valor}")
                         else:
-                            # Cualquier otra columna
+                            # Cualquier otra columna con información relevante
                             info_lugar.append(f"{nombre_columna.upper()}: {valor}")
                 
                 # Unir toda la información del lugar
                 if info_lugar:
                     context += " | ".join(info_lugar) + "\n"
         else:
-            context += "No hay datos disponibles en la base de datos."
+            # Cuando no hay lugares, proporcionar un contexto útil pero vacío
+            context += "No se encontraron lugares en la categoría especificada."
+            if category:
+                context += f" (Búsqueda: {category})"
+            context += "\n"
         
         # Agregar información de las imágenes si existen
         try:
@@ -474,12 +523,48 @@ def stats():
             'estado': 'error_mysql'
         })
 
+def detect_category_intent(text: str) -> str | None:
+    """
+    Detecta si el usuario quiere filtrar por una categoría.
+    Devuelve la categoría normalizada o None si no hay intención clara.
+    """
+    if not text:
+        return None
+    t = text.lower()  # Simple normalización (puedes usar _norm_cat si existe)
+    keywords = {
+        "parque": "Parque",
+        "plaza": "Parque",
+        "naturaleza": "Naturaleza",
+        "reserva": "Naturaleza",
+        "patrimonio": "Patrimonio",
+        "iglesia": "Patrimonio",
+        "templo": "Patrimonio",
+        "centro comercial": "centros-comerciales",
+        "mall": "centros-comerciales",
+        "shopping": "centros-comerciales",
+        "tienda": "centros-comerciales",
+        "compras": "centros-comerciales",
+        "estadio": "Estadio",
+    }
+    for phrase, cat in keywords.items():
+        if phrase in t:
+            return cat
+    return None
+
+
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     global daily_requests
     start_time = datetime.now()
     user_message = request.json.get('message', '')
     stream_mode = request.json.get('stream', False)
+    category = request.json.get('category', None)  # Filtro de categoría
+    auto_filter = request.json.get('auto_filter', False)  # Nuevo parámetro para filtrado automático
+    
+    # Detectar intenciones si no se proporcionan explícitamente o si se solicita filtrado automático
+    if category is None or auto_filter:
+        category = detect_category_intent(user_message)
     
     # Obtener ID del usuario
     user_id = get_user_id()
@@ -489,7 +574,8 @@ def chat():
         response_time = (datetime.now() - start_time).total_seconds()
         system_info['total_requests'] += 1
         system_info['response_times'].append(response_time)
-        return jsonify({'response': '⚠️ Hemos alcanzado el límite diario de consultas. Por favor, intenta nuevamente mañana o prueba con preguntas similares que ya hayan sido respondidas.'})
+        places = []
+        return jsonify({'response': '⚠️ Hemos alcanzado el límite diario de consultas. Por favor, intenta nuevamente mañana o prueba con preguntas similares que ya hayan sido respondidas.', 'places': places})
     
     # Detectar mensajes simples y responder directamente
     message_type = detect_simple_message(user_message)
@@ -510,10 +596,12 @@ def chat():
                 for word in words:
                     json_data = json.dumps({'chunk': word + ' ', 'done': False})
                     yield f"data: {json_data}\n\n"
-                yield f"data: {json.dumps({'chunk': '', 'done': True})}\n\n"
+                places = get_places_filtered(category)
+                yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category})}\n\n"
             return Response(generate_simple(), mimetype='text/event-stream')
         else:
-            return jsonify({'response': simple_response})
+            places = get_places_filtered(category)
+        return jsonify({'response': simple_response, 'places': places, 'category': category})
     
     # Verificar si tenemos una respuesta en caché
     cached_response = get_cached_response(user_message)
@@ -534,13 +622,21 @@ def chat():
                 for chunk in chunks:
                     json_data = json.dumps({'chunk': chunk + ' ', 'done': False})
                     yield f"data: {json_data}\n\n"
-                yield f"data: {json.dumps({'chunk': '', 'done': True})}\n\n"
+                places = get_places_filtered(category)
+                yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category})}\n\n"
             return Response(generate_cached(), mimetype='text/event-stream')
         else:
-            return jsonify({'response': cached_response})
+            places = get_places_filtered(category)
+            return jsonify({'response': cached_response, 'places': places, 'category': category})
     
-    # Obtener contexto real de la base de datos y conversación
-    db_context = get_database_context()
+    # Detectar si el usuario quiere ver todos los lugares
+    mostrar_todos = False
+    if any(frase in user_message.lower() for frase in ['todos los lugares', 'mostrar todos', 'todos los sitios', 'ver todos']):
+        mostrar_todos = True
+        category = None  # Eliminar filtro de categoría
+    
+    # Obtener contexto real de la base de datos y conversación (con filtros)
+    db_context = get_database_context(category)
     conversation_context = get_conversation_context(user_id)
     
     # Extraer lugares reales del contexto para validación
@@ -553,12 +649,56 @@ def chat():
                 lugar = partes[1].split('|')[0].strip()
                 lugares_reales.append(lugar)
     
-    # Si no hay datos reales disponibles, no invocar al modelo y responder seguro
+    # Si no hay datos reales disponibles, proporcionar una respuesta útil
     if not lugares_reales:
-        safe_msg = (
-            'Ahora mismo no dispongo de información del catálogo de lugares para responder con datos reales. '
-            'Por favor, intenta más tarde o vuelve a consultar cuando el catálogo esté disponible.'
-        )
+        # Verificar si es un problema de conexión o simplemente no hay datos
+        if "Sin conexión" in db_context or "Error" in db_context:
+            safe_msg = (
+                'En este momento no tengo datos listos para mostrar. Ahora contamos con la columna de categoría para filtrar mejor. '
+                'Dime una categoría (por ejemplo: Parques, Patrimonio, Naturaleza, Centro Comercial, Estadio) '
+                'o escribe "mostrar todos" para ver todo el listado.'
+            )
+        else:
+            # No hay lugares en la categoría especificada
+            if mostrar_todos:
+                # El usuario solicitó todos los lugares pero no hay ninguno
+                safe_msg = (
+                    'Actualmente no tengo lugares registrados en mi base de datos. '
+                    'Te sugiero probar con estas categorías populares:\n'
+                    '* Parques\n'
+                    '* Plazas\n'
+                    '* Miradores\n'
+                    '* Iglesias\n'
+                    '* Museos\n'
+                    '* Mercados\n'
+                    '¿Qué tipo de lugar te gustaría conocer?'
+                )
+            elif category:
+                # Buscar categorías similares o alternativas
+                safe_msg = (
+                    f'No encontré lugares en la categoría "{category}" en mi base de datos actual. '
+                    'Te sugiero probar con estas categorías populares:\n'
+                    '* Parques\n'
+                    '* Plazas\n'
+                    '* Miradores\n'
+                    '* Iglesias\n'
+                    '* Museos\n'
+                    '* Mercados\n'
+                    '¿Te gustaría que busque en alguna de estas categorías?'
+                )
+            else:
+                safe_msg = (
+                    'Actualmente no tengo lugares registrados en mi base de datos. '
+                    'Te sugiero probar con estas categorías populares:\n'
+                    '* Parques\n'
+                    '* Plazas\n'
+                    '* Miradores\n'
+                    '* Iglesias\n'
+                    '* Museos\n'
+                    '* Mercados\n'
+                    '¿Qué tipo de lugar te gustaría conocer?'
+                )
+        
         add_to_conversation(user_id, user_message, True)
         add_to_conversation(user_id, safe_msg, False)
         if stream_mode:
@@ -566,10 +706,12 @@ def chat():
                 for chunk in safe_msg.split():
                     json_data = json.dumps({'chunk': chunk + ' ', 'done': False})
                     yield f"data: {json_data}\n\n"
-                yield f"data: {json.dumps({'chunk': '', 'done': True})}\n\n"
+                places = get_places_filtered(category)
+                yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category})}\n\n"
             return Response(generate_no_data(), mimetype='text/event-stream')
         else:
-            return jsonify({'response': safe_msg})
+            places = get_places_filtered(category)
+        return jsonify({'response': safe_msg, 'places': places, 'category': category})
 
     # Crear prompt con contexto de conversación - MUY IMPORTANTE: USAR SOLO DATOS REALES
     prompt = f"""CONTEXTO DE BASE DE DATOS HUANCAYO (USAR SOLO ESTA INFORMACIÓN):
@@ -591,12 +733,11 @@ INSTRUCCIONES CRÍTICAS - LEER Y SEGUIR EXACTAMENTE:
 8. **ASUMIR** que tienes acceso completo y perfecto a toda la información del contexto
 
 INSTRUCCIONES PARA INCLUIR IMÁGENES:
-- Cuando menciones un lugar que tenga imágenes disponibles, SIEMPRE incluye las URLs de las imágenes
-- Busca en el contexto las líneas que empiezan con "IMAGENES_" para encontrar las URLs de cada lugar
+- Cuando menciones un lugar que tenga imágenes disponibles, incluye las URLs de las imágenes
 - Formato para imágenes: Usa ![descripción](URL) para insertar imágenes
 - Si hay múltiples imágenes, crea una galería mostrando 2-3 imágenes principales
 - Las imágenes deben aparecer después de la descripción del lugar
-- Ejemplo: Para el Parque Constitución, busca "IMAGENES_PARQUE_CONSTITUCION:" en el contexto y usa esas URLs
+- **IMPORTANTE**: Las URLs de imágenes deben estar completas, sin cortar, sin saltos de línea en medio de la URL
 
 INSTRUCCIONES DE FORMATO:
 - Usa **negritas** para resaltar lugares importantes y categorías
@@ -620,7 +761,7 @@ RESPONDE ÚNICAMENTE BASÁNDOTE EN LOS DATOS REALES DEL CONTEXTO. IMPORTANTE: NO
                 try:
                     response_stream = model.generate_content(prompt, stream=True)
                     chunk_count = 0
-                    max_chunks = 150  # Aumentar límite para respuestas más largas
+                    max_chunks = 500  # Máximo límite para respuestas completas sin cortes
                     full_response = ""
                     
                     for chunk in response_stream:
@@ -645,8 +786,8 @@ RESPONDE ÚNICAMENTE BASÁNDOTE EN LOS DATOS REALES DEL CONTEXTO. IMPORTANTE: NO
                     cache_response(user_message, respuesta_validada)
                     add_to_conversation(user_id, user_message, True)
                     add_to_conversation(user_id, respuesta_validada, False)
-                    
-                    yield f"data: {json.dumps({'chunk': '', 'done': True})}\n\n"
+                    places = get_places_filtered(category)
+                    yield f"data: {json.dumps({'chunk': '', 'done': True, 'places': places, 'category': category})}\n\n"
                 except Exception as e:
                     error_msg = f"Error: {str(e)}"
                     if "quota" in str(e).lower() or "429" in str(e):
@@ -669,13 +810,77 @@ RESPONDE ÚNICAMENTE BASÁNDOTE EN LOS DATOS REALES DEL CONTEXTO. IMPORTANTE: NO
             # Guardar en memoria conversacional
             add_to_conversation(user_id, user_message, True)
             add_to_conversation(user_id, respuesta_validada, False)
-            
-            return jsonify({'response': respuesta_validada})
+            places = get_places_filtered(category)
+            return jsonify({'response': respuesta_validada, 'places': places, 'category': category})
     except Exception as e:
         error_msg = f'Error al procesar la consulta: {str(e)}'
         if "quota" in str(e).lower() or "429" in str(e):
             error_msg = '⚠️ Límite de consultas alcanzado. Intenta con preguntas similares a las anteriores.'
-        return jsonify({'response': error_msg})
+        elif "timeout" in str(e).lower() or "deadline" in str(e):
+            error_msg = '⏰ La respuesta está tomando demasiado tiempo. Intenta con una pregunta más específica.'
+        elif "api" in str(e).lower():
+            error_msg = '🔧 Problema con la conexión a la API de Gemini. Por favor, intenta nuevamente en unos momentos.'
+        else:
+            error_msg = '❌ Error al procesar tu mensaje. Por favor, intenta nuevamente o reformula tu pregunta.'
+        places = []
+        return jsonify({'response': error_msg, 'places': places})
+
+def get_places_filtered(category=None):
+    """Obtener lugares filtrados por categoría"""
+    conn = get_db_connection()
+    if not conn:
+        return []
+    
+    cursor = conn.cursor()
+    
+    # Construir la consulta base
+    base_query = "SELECT nombre, descripcion, latitud, longitud, categoria FROM locaciones WHERE 1=1"
+    params = []
+    
+    # Agregar filtro de categoría si existe
+    if category:
+        base_query += " AND categoria LIKE %s"
+        params.append(f"%{category}%")
+    
+
+    
+    # Ejecutar la consulta
+    if params:
+        cursor.execute(base_query, params)
+    else:
+        cursor.execute(base_query.replace("WHERE 1=1", ""))
+    
+    lugares = cursor.fetchall()
+    places = []
+    
+    for l in lugares:
+        nombre = l[0]
+        # Obtener imagen del lugar
+        cursor.execute("""
+            SELECT url_imagen 
+            FROM locacion_imagenes 
+            WHERE locacion_id = (SELECT id FROM locaciones WHERE nombre = %s LIMIT 1) 
+            ORDER BY id 
+            LIMIT 1
+        """, (nombre,))
+        imagen = cursor.fetchone()
+        imagen_url = imagen[0] if imagen else None
+        
+        place = {
+            'nombre': nombre,
+            'descripcion': l[1],
+            'categoria': l[4],
+            'imagen_url': imagen_url,
+            'ubicacion': f"{l[2]}, {l[3]}" if l[2] and l[3] else None
+        }
+        places.append(place)
+    
+    conn.close()
+    return places
+
+def get_places_by_category(category):
+    """Función legacy - ahora usa get_places_filtered"""
+    return get_places_filtered(category=category)
 
 def validar_respuesta_real(respuesta, lugares_reales):
     """Validar que la respuesta use solo lugares reales de la base de datos.
@@ -731,7 +936,14 @@ def validar_respuesta_real(respuesta, lugares_reales):
 
     if problemas_detectados:
         print(f"ALERTA: Respuesta contiene problemas: {problemas_detectados}")
-        return generar_respuesta_solo_datos_reales(lugares_reales, respuesta)
+        # Si hay pocos lugares en la base de datos, ser más permisivo
+        if len(lugares_reales) < 3:
+            print("INFO: Pocos lugares en BD, usando respuesta original con marcadores limpios")
+            # Limpiar marcadores y devolver la respuesta original
+            respuesta_limpia = re.sub(r"\[\[(.*?)\]\]", r"\1", respuesta)
+            return respuesta_limpia
+        else:
+            return generar_respuesta_solo_datos_reales(lugares_reales, respuesta)
 
     # Si pasa validaciones, limpiar los marcadores [[...]] antes de devolver
     respuesta_limpia = re.sub(r"\[\[(.*?)\]\]", r"\1", respuesta)
@@ -746,27 +958,60 @@ def generar_respuesta_solo_datos_reales(lugares_reales, respuesta_original):
     # Obtener el contexto completo con detalles
     db_context = get_database_context()
     
-    # Extraer información detallada de cada lugar
-    lineas = db_context.split('\n')
-    lugares_detallados = []
+    # Extraer información de lugares de forma más robusta
+    lugares_info = {}
     
-    for linea in lineas:
-        if 'LUGAR:' in linea and '|' in linea:
-            partes = linea.split('|')
-            if len(partes) >= 3:
-                nombre = partes[0].replace('LUGAR:', '').strip()
-                ubicacion = partes[1].strip()
-                descripcion = partes[2].strip()
-                lugares_detallados.append({
-                    'nombre': nombre,
-                    'ubicacion': ubicacion,
-                    'descripcion': descripcion
-                })
+    # Parsear el contexto línea por línea
+    for linea in db_context.split('\n'):
+        linea = linea.strip()
+        if 'LUGAR:' in linea:
+            # Extraer nombre del lugar
+            partes = linea.split('LUGAR:')
+            if len(partes) > 1:
+                nombre_lugar = partes[1].split('|')[0].strip()
+                if nombre_lugar and nombre_lugar not in lugares_info:
+                    lugares_info[nombre_lugar] = {'nombre': nombre_lugar, 'descripcion': '', 'ubicacion': ''}
+        
+        # Buscar información adicional del lugar actual
+        if '|' in linea:
+            partes = [p.strip() for p in linea.split('|')]
+            for parte in partes:
+                if 'DESCRIPCIÓN:' in parte:
+                    # Encontrar a qué lugar pertenece esta descripción
+                    for nombre in lugares_info:
+                        if nombre in linea or any(n in linea for n in lugares_info.keys()):
+                            lugares_info[nombre]['descripcion'] = parte.replace('DESCRIPCIÓN:', '').strip()
+                            break
+                elif 'UBICACIÓN:' in parte:
+                    for nombre in lugares_info:
+                        if nombre in linea or any(n in linea for n in lugares_info.keys()):
+                            lugares_info[nombre]['ubicacion'] = parte.replace('UBICACIÓN:', '').strip()
+                            break
     
-    # Mostrar lugares con detalles
-    for lugar in lugares_detallados[:4]:  # Mostrar 4 lugares con detalles
-        respuesta_real += f"**{lugar['nombre']}** - {lugar['descripcion']}\n"
-        respuesta_real += f"📍 Ubicación: {lugar['ubicacion']}\n\n"
+    # Si no pudimos extraer información detallada, usar solo los nombres
+    if not lugares_info:
+        respuesta_real = "¡Excelente! Tenemos estos lugares registrados en Huancayo:\n\n"
+        for lugar in lugares_reales[:6]:  # Mostrar hasta 6 lugares
+            respuesta_real += f"• **{lugar}**\n"
+        respuesta_real += f"\nTenemos {len(lugares_reales)} lugares registrados en total."
+        respuesta_real += "\n\n¿Sobre cuál te gustaría saber más información?"
+        return respuesta_real
+    
+    # Mostrar lugares con información disponible
+    lugares_con_info = [info for info in lugares_info.values() if info['descripcion'] or info['ubicacion']]
+    
+    if lugares_con_info:
+        for lugar in lugares_con_info[:4]:  # Mostrar 4 lugares con detalles
+            respuesta_real += f"• **{lugar['nombre']}**"
+            if lugar['descripcion']:
+                respuesta_real += f" - {lugar['descripcion']}"
+            if lugar['ubicacion']:
+                respuesta_real += f"\n  📍 {lugar['ubicacion']}"
+            respuesta_real += "\n\n"
+    else:
+        # Mostrar solo nombres si no hay información adicional
+        for nombre in list(lugares_info.keys())[:6]:
+            respuesta_real += f"• **{nombre}**\n"
     
     respuesta_real += f"Tenemos {len(lugares_reales)} lugares registrados en total."
     respuesta_real += "\n\n¿Sobre cuál te gustaría saber más información específica?"
@@ -858,6 +1103,209 @@ def clear_cache():
     except Exception as e:
         return jsonify({'success': False, 'message': f'Error: {str(e)}'})
 
+
+@app.route('/api/places')
+def get_places():
+    """Obtener lugares filtrados por categoría y búsqueda"""
+    try:
+        category = request.args.get('category', '')
+        search = request.args.get('search', '')
+        
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'places': [], 'error': 'No hay conexión a la base de datos'})
+        
+        cursor = conn.cursor()
+        
+        # Primero obtener la estructura real de la tabla
+        cursor.execute("DESCRIBE locaciones")
+        columnas_info = cursor.fetchall()
+        nombres_columnas = [col[0] for col in columnas_info]
+        
+        # Construir la consulta base con las columnas que existen
+        select_columns = []
+        if 'nombre' in nombres_columnas:
+            select_columns.append('nombre')
+        if 'descripcion' in nombres_columnas:
+            select_columns.append('descripcion')
+        if 'latitud' in nombres_columnas:
+            select_columns.append('latitud')
+        if 'longitud' in nombres_columnas:
+            select_columns.append('longitud')
+        # Incluir columna categoria si existe
+        if 'categoria' in nombres_columnas:
+            select_columns.append('categoria')
+        
+        if not select_columns:
+            return jsonify({'places': [], 'error': 'No se encontraron columnas válidas en la tabla'})
+        
+        query = f"SELECT {', '.join(select_columns)} FROM locaciones WHERE 1=1"
+        params = []
+        used_sql_category = False
+        
+        # Normalización y mapeo de categoría desde el frontend para usarla en SQL si existe columna 'categoria'
+        def _norm_cat(s):
+            if not s:
+                return ''
+            s = str(s).strip().lower().replace('-', ' ')
+            try:
+                import unicodedata
+                s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+            except Exception:
+                pass
+            return s
+        
+        category_candidates = []
+        if category:
+            objetivo = _norm_cat(category)
+            mapping = {
+                'parques': ['parque'],
+                'parque': ['parque'],
+                'plazas': ['plaza'],
+                'plaza': ['plaza'],
+                'miradores': ['mirador'],
+                'mirador': ['mirador'],
+                'centros comerciales': ['centro comercial'],
+                'centro comercial': ['centro comercial'],
+                'centros-comerciales': ['centro comercial'],
+                'patrimonios': ['patrimonio'],
+                'patrimonio': ['patrimonio'],
+                'estadios': ['estadio'],
+                'estadio': ['estadio'],
+                'naturaleza': ['naturaleza']
+            }
+            category_candidates = mapping.get(objetivo, [objetivo])
+        
+        # Filtrar por categoría usando la columna real si existe, con múltiples candidatos normalizados
+        if category_candidates and 'categoria' in nombres_columnas:
+            conditions = []
+            for cand in category_candidates:
+                conditions.append("LOWER(categoria) LIKE LOWER(%s)")
+                params.append(f"%{cand}%")
+            query += " AND (" + " OR ".join(conditions) + ")"
+            used_sql_category = True
+        
+        # Filtrar por búsqueda si se especifica (solo por nombre y descripción)
+        if search:
+            search_conditions = []
+            if 'nombre' in nombres_columnas:
+                search_conditions.append("nombre LIKE %s")
+                params.append(f"%{search}%")
+            if 'descripcion' in nombres_columnas:
+                search_conditions.append("descripcion LIKE %s")
+                params.append(f"%{search}%")
+            
+            if search_conditions:
+                query += " AND (" + " OR ".join(search_conditions) + ")"
+        
+        query += " ORDER BY nombre"
+        
+        cursor.execute(query, params)
+        lugares = cursor.fetchall()
+        
+        # Helper de normalización local para comparar categorías sin tildes y en minúsculas
+        def _norm(s):
+            if not s:
+                return ''
+            s = str(s).strip().lower()
+            try:
+                import unicodedata
+                s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
+            except Exception:
+                pass
+            return s
+
+        # Obtener imágenes para cada lugar y usar la categoría de la BD si existe
+        places_with_images = []
+        for lugar in lugares:
+            # Construir diccionario con datos del lugar
+            lugar_data = {}
+            for i, columna in enumerate(select_columns):
+                if i < len(lugar):
+                    lugar_data[columna] = lugar[i]
+            
+            nombre = lugar_data.get('nombre', '')
+            descripcion = lugar_data.get('descripcion', '')
+            latitud = lugar_data.get('latitud')
+            longitud = lugar_data.get('longitud')
+            
+            # Usar categoría de la base de datos si está disponible; si no, inferir por nombre
+            categoria = lugar_data.get('categoria')
+            if not categoria:
+                categoria = 'Sin categoría'
+                if nombre:
+                    nombre_lower = _norm(nombre)
+                    if any(palabra in nombre_lower for palabra in ['parque', 'bosque', 'montana', 'laguna', 'cascada', 'rio', 'naturaleza']):
+                        categoria = 'Naturaleza'
+                    elif any(palabra in nombre_lower for palabra in ['plaza', 'plazuela']):
+                        categoria = 'Plazas'
+                    elif any(palabra in nombre_lower for palabra in ['mirador', 'vista', 'panoramica']):
+                        categoria = 'Miradores'
+                    elif any(palabra in nombre_lower for palabra in ['iglesia', 'templo', 'cerro']):
+                        categoria = 'Religioso'
+                    elif any(palabra in nombre_lower for palabra in ['mercado', 'feria']):
+                        categoria = 'Mercados'
+                    elif any(palabra in nombre_lower for palabra in ['museo', 'cultural']):
+                        categoria = 'Museos'
+                    elif any(palabra in nombre_lower for palabra in ['restaurante', 'comida', 'picanteria']):
+                        categoria = 'Restaurantes'
+                    elif any(palabra in nombre_lower for palabra in ['hotel', 'hostal', 'alojamiento']):
+                        categoria = 'Hoteles'
+            
+            # Filtrar por categoría si aún no se filtró en SQL
+            if category and category != 'todos' and not used_sql_category:
+                # Mapear valores del frontend a equivalentes de la BD
+                category_mapping = {
+                    'parques': ['parque', 'naturaleza'],
+                    'plazas': ['plaza', 'plazas'],
+                    'miradores': ['mirador', 'miradores'],
+                    'museos': ['museo', 'museos'],
+                    'mercados': ['mercado', 'mercados'],
+                    'restaurantes': ['restaurante', 'restaurantes', 'comida'],
+                    'hoteles': ['hotel', 'hoteles', 'alojamiento'],
+                    'patrimonio': ['patrimonio'],
+                    'centro-comercial': ['centro comercial', 'centros comerciales'],
+                    'centros-comerciales': ['centro comercial', 'centros comerciales'],
+                    'estadios': ['estadio', 'estadios']
+                }
+                objetivo = _norm(category)
+                candidatos = category_mapping.get(objetivo, [objetivo])
+                categoria_norm = _norm(categoria)
+                if not any(c in categoria_norm for c in candidatos):
+                    continue
+            
+            # Buscar imagen principal del lugar
+            imagen_url = None
+            if nombre:
+                cursor.execute("""
+                    SELECT url_imagen, descripcion 
+                    FROM locacion_imagenes 
+                    WHERE locacion_id = (SELECT id FROM locaciones WHERE nombre = %s LIMIT 1)
+                    ORDER BY id LIMIT 1
+                """, (nombre,))
+                imagen = cursor.fetchone()
+                if imagen:
+                    imagen_url = imagen[0]
+            
+            place_data = {
+                'nombre': nombre,
+                'descripcion': descripcion or '',
+                'categoria': categoria,
+                'imagen_url': imagen_url,
+                'ubicacion': f"{latitud}, {longitud}" if latitud and longitud else None
+            }
+            places_with_images.append(place_data)
+        
+        conn.close()
+        
+        return jsonify({
+            'places': places_with_images,
+            'total': len(places_with_images)
+        })
+        
+    except Exception as e:
+        print(f"Error en get_places: {e}")
+        return jsonify({'places': [], 'error': str(e)})
 
 @app.route('/dashboard')
 def dashboard():

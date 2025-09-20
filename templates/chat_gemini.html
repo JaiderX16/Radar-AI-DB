@@ -1,871 +1,568 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chatbot IA - Lugares de Huancayo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1a1a1a',
+                        secondary: '#333333',
+                        accent: '#4a90e2'
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            background-color: #ffffff;
-            color: #000000;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #000000, #333333);
-            color: #ffffff;
-            padding: 20px;
-            text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .header h1 {
-            font-size: 24px;
-            font-weight: 300;
-            letter-spacing: 1px;
-        }
-
-        .header p {
-            font-size: 14px;
-            opacity: 0.8;
-            margin-top: 5px;
-        }
-
-        .chat-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            max-width: 800px;
-            width: 100%;
-            margin: 0 auto;
-            padding: 20px;
-        }
-
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px 0;
-            scroll-behavior: smooth;
-        }
-
-        .message {
-            margin-bottom: 20px;
-            display: flex;
-            align-items: flex-start;
-            animation: fadeIn 0.3s ease-in;
-        }
-
+        /* Animaciones personalizadas */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-
-        .message.bot {
-            justify-content: flex-start;
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
         }
-
-        .message.user {
-            justify-content: flex-end;
+        
+        /* Scrollbar personalizada */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
         }
-
-        .message-content {
-            max-width: 70%;
-            padding: 15px 20px;
-            border-radius: 20px;
-            font-size: 16px;
-            line-height: 1.6;
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
         }
-
-        /* Estilos mejorados para el contenido formateado */
-        .message-content h2 {
-            font-size: 18px;
-            font-weight: bold;
-            margin: 15px 0 10px 0;
-            color: #000000;
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
         }
-
-        .message-content h3 {
-            font-size: 17px;
-            font-weight: bold;
-            margin: 12px 0 8px 0;
-            color: #333333;
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
         }
-
-        .message-content h4 {
-            font-size: 16px;
-            font-weight: bold;
-            margin: 10px 0 6px 0;
-            color: #555555;
-        }
-
-        .message-content strong {
-            font-weight: bold;
-            color: #000000;
-        }
-
-        .message-content ul {
-            margin: 10px 0;
-            padding-left: 20px;
-        }
-
-        .message-content li {
-            margin: 8px 0;
-            line-height: 1.5;
-        }
-
-        .message-content img {
-            max-width: 100%;
-            height: auto;
-            border-radius: 8px;
-            margin: 10px 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            display: block;
-        }
-
-        .message-content img:hover {
-            transform: scale(1.02);
-            transition: transform 0.3s ease;
-        }
-
-        /* Estilos para tarjetas de imagen (estilo WhatsApp/Instagram) */
+        
+        /* Estilos para las tarjetas de imagen */
         .image-card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            margin: 12px 0;
-            overflow: hidden;
-            max-width: 320px;
-            display: inline-block;
             transition: all 0.3s ease;
             cursor: pointer;
         }
-
+        
         .image-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
         }
-
-        .image-container {
-            position: relative;
-            width: 100%;
-            height: 200px;
-            overflow: hidden;
-        }
-
+        
         .image-container img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 0;
-            margin: 0;
-            display: block;
             transition: transform 0.3s ease;
         }
-
+        
         .image-container:hover img {
             transform: scale(1.05);
         }
-
-        .image-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: linear-gradient(transparent, rgba(0,0,0,0.6));
-            padding: 20px 12px 12px;
+        
+        /* Dashboard styles */
+        .dashboard-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            font-size: 12px;
-            font-weight: 500;
-            line-height: 1.3;
-        }
-
-        /* Responsive para tarjetas de imagen */
-        @media (max-width: 600px) {
-            .image-card {
-                max-width: 280px;
-            }
-            
-            .image-container {
-                height: 180px;
-            }
-        }
-
-        .message-content p {
-            margin: 10px 0;
-            line-height: 1.6;
-        }
-
-        .message.bot .message-content {
-            background: #f8f9fa;
-            color: #000000;
-            border: 1px solid #dee2e6;
-        }
-
-        .message.user .message-content {
-            background: #000000;
-            color: #ffffff;
-        }
-
-        .typing-indicator {
-            display: none;
-            padding: 15px 20px;
-            color: #666666;
-            font-style: italic;
-            margin-bottom: 10px;
-        }
-
-        .typing-dots {
-            display: inline-block;
-        }
-
-        .typing-dots span {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #666;
-            margin: 0 2px;
-            animation: typing 1.4s infinite ease-in-out;
-        }
-
-        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
-        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
-
-        @keyframes typing {
-            0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
-            40% { transform: scale(1); opacity: 1; }
-        }
-
-        .input-container {
-            background: #ffffff;
-            border-top: 1px solid #e0e0e0;
-            padding: 20px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            position: sticky;
-            bottom: 0;
-        }
-
-        .new-chat-button {
-            padding: 12px 16px;
-            background: #000000;
-            color: #ffffff;
-            border: none;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 14px;
-            white-space: nowrap;
-            transition: background 0.3s;
-        }
-
-        .new-chat-button:hover {
-            background: #333333;
-        }
-
-        .message-input {
-            flex: 1;
-            padding: 15px 20px;
-            border: 2px solid #000000;
-            border-radius: 25px;
-            font-size: 16px;
-            outline: none;
-            background: #ffffff;
-            color: #000000;
-            transition: all 0.3s ease;
-        }
-
-        .message-input:focus {
-            border-color: #333333;
-            box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
-        }
-
-        .message-input::placeholder {
-            color: #999999;
-        }
-
-        .send-button {
-            background: #000000;
-            color: #ffffff;
-            border: none;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-        }
-
-        .send-button:hover:not(:disabled) {
-            transform: scale(1.1);
-            background: #333333;
-        }
-
-        .send-button:active:not(:disabled) {
-            transform: scale(0.9);
-        }
-
-        .send-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .quick-suggestions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 15px;
-            justify-content: center;
-        }
-
-        .suggestion {
-            background: #ffffff;
-            border: 1px solid #000000;
-            color: #000000;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .suggestion:hover {
-            background: #000000;
-            color: #ffffff;
-            transform: translateY(-1px);
-        }
-
-        .welcome-message {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #666666;
-            font-size: 14px;
-        }
-
-        .stats {
-            text-align: center;
-            margin-bottom: 15px;
-            color: #666666;
-            font-size: 14px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0 10px;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         
-        .dashboard-link {
-            color: #666666;
-            text-decoration: none;
-            font-size: 12px;
-            background: rgba(0,0,0,0.05);
-            padding: 5px 10px;
-            border-radius: 15px;
-            transition: all 0.3s ease;
+        .category-filter {
+            transition: all 0.2s ease;
         }
         
-        .dashboard-link:hover {
-            background: rgba(0,0,0,0.1);
-            color: #000000;
+        .category-filter:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-
-        .ai-badge {
-            display: inline-block;
-            background: #0066cc;
+        
+        .category-filter.active {
+            background: #4a90e2;
             color: white;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 11px;
-            margin-left: 8px;
-            vertical-align: middle;
         }
-
-        @media (max-width: 600px) {
-            .chat-container {
-                padding: 10px;
-            }
-            
-            .message-content {
-                max-width: 85%;
-                font-size: 15px;
-                padding: 12px 16px;
-            }
-            
-            .header h1 {
-                font-size: 20px;
-            }
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
         }
     </style>
 </head>
-<body>
-    <div class="header">
-        <h1>Chatbot IA - Lugares de Huancayo <span class="ai-badge">GEMINI</span></h1>
-        <p>Asistente inteligente con IA real</p>
-    </div>
-
-    <div class="chat-container">
-        <div class="stats" id="stats">
-            <span id="stats-text">Cargando información...</span>
-            <a href="/dashboard" class="dashboard-link">📊 Dashboard</a>
-        </div>
-
-        <div class="quick-suggestions" id="suggestions">
-            <div class="suggestion" onclick="sendSuggestion('¿Cuántos lugares hay en Huancayo?')">Total lugares</div>
-            <div class="suggestion" onclick="sendSuggestion('Dime sobre lugares turísticos')">Turísticos</div>
-            <div class="suggestion" onclick="sendSuggestion('¿Dónde está el Parque Constitución?')">Parque Constitución</div>
-            <div class="suggestion" onclick="sendSuggestion('Lugares culturales')">Culturales</div>
-            <div class="suggestion" onclick="sendSuggestion('¿Qué me recomiendas visitar?')">Recomendaciones</div>
-        </div>
-
-        <div class="messages" id="messages">
-            <div class="welcome-message">
-                <strong>¡Hola! Soy tu asistente inteligente sobre lugares en Huancayo</strong><br>
-                Puedes preguntarme cualquier cosa sobre lugares turísticos, culturales, restaurantes, y más. 
-                Usaré mi inteligencia artificial para darte respuestas útiles y precisas.
-            </div>
-            <div class="message bot">
-                <div class="message-content">
-                    ¡Bienvenido! Estoy aquí para ayudarte a descubrir los mejores lugares de Huancayo. 
-                    Puedes preguntarme sobre cualquier lugar, desde parques hasta restaurantes, 
-                    y te daré información detallada y recomendaciones personalizadas.
-                    
-¿Qué te gustaría saber?
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-primary text-white shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl font-bold">Chatbot IA - Lugares de Huancayo</h1>
+                    <p class="text-gray-300 text-sm">Descubre lugares turísticos con inteligencia artificial</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button onclick="newChat()" class="bg-secondary hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors">
+                        <i class="fas fa-plus mr-2"></i>Nuevo Chat
+                    </button>
                 </div>
             </div>
         </div>
+    </header>
 
-        <div class="typing-indicator" id="typing">
-            <div class="typing-dots">
-                <span></span>
-                <span></span>
-                <span></span>
+
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Chat Section -->
+            <div class="lg:col-span-2">
+                <!-- Chat Container -->
+                <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+                    <!-- Chat Header -->
+                    <div class="bg-primary text-white px-6 py-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h2 class="text-xl font-semibold">Chat con IA</h2>
+                                <p class="text-gray-300 text-sm">Gemini - Información turística</p>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                            <span class="bg-green-500 w-3 h-3 rounded-full"></span>
+                            <span class="text-sm">En línea</span>
+                        </div>
+                    </div>
+                </div>
+
+                    <!-- Messages -->
+                    <div class="h-96 overflow-y-auto custom-scrollbar p-6" id="messages">
+                        <div class="flex items-start space-x-3 mb-4 fade-in">
+                            <div class="bg-primary text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">
+                                IA
+                            </div>
+                            <div class="bg-gray-100 rounded-lg px-4 py-3 max-w-xs lg:max-w-md">
+                                <p class="text-gray-800">¡Hola! Soy tu asistente de IA con información sobre lugares turísticos en Huancayo.</p>
+                                <p class="text-gray-800 mt-2">¿Qué te gustaría conocer?</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input Container -->
+                    <div class="border-t bg-gray-50 px-6 py-4">
+                        <div class="flex space-x-4">
+                            <input type="text" id="message-input" placeholder="Escribe tu pregunta sobre lugares en Huancayo..." 
+                                   class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-transparent">
+                            <button onclick="sendMessage()" id="send-button" 
+                                    class="bg-accent hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Quick Suggestions -->
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <button onclick="sendSuggestion('Que parques hay en Huancayo?')" 
+                                    class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm hover:bg-blue-200 transition-colors">
+                                Parques
+                            </button>
+                            <button onclick="sendSuggestion('Donde puedo ir con ninos?')" 
+                                    class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm hover:bg-green-200 transition-colors">
+                                Familia
+                            </button>
+                            <button onclick="sendSuggestion('Que lugares son gratis?')" 
+                                    class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm hover:bg-yellow-200 transition-colors">
+                                Gratis
+                            </button>
+                            <button onclick="sendSuggestion('Donde puedo comer?')" 
+                                    class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm hover:bg-red-200 transition-colors">
+                                Comida
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- LUGARES DESTACADOS - NUEVA SECCIÓN EN PANTALLA PRINCIPAL -->
+                <div class="bg-white rounded-lg shadow-lg p-6 mt-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-gray-800">
+                            <i class="fas fa-map-marker-alt mr-2 text-green-500"></i>Lugares Destacados en Huancayo
+                        </h3>
+                    </div>
+                    
+                    <!-- Lista de lugares en pantalla principal -->
+                    <div id="main-places-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                        <!-- Los lugares se cargarán aquí dinámicamente -->
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-map-marked-alt text-4xl mb-2"></i>
+                            <p>Cargando lugares de Huancayo...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="input-container">
-            <button id="new-chat-button" class="new-chat-button">Nuevo Chat</button>
-            <input type="text" \
-                   class="message-input" \
-                   id="messageInput" \
-                   placeholder="Escribe tu pregunta sobre lugares en Huancayo..." \
-                   autocomplete="off">
-            <button class="send-button" id="sendButton" onclick="sendMessage()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22,2 15,22 11,13 2,9"></polygon>
-                </svg>
-            </button>
+            <!-- Sidebar - Quick Actions & Info -->
+            <div class="space-y-6">
+                <!-- Quick Stats -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                        <i class="fas fa-chart-line mr-2 text-blue-500"></i>Estadísticas Rápidas
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Lugares activos:</span>
+                            <span id="sidebar-places-count" class="font-bold text-blue-600">-</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-600">Chats hoy:</span>
+                            <span id="sidebar-chats-count" class="font-bold text-green-600">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Help Section -->
+                <div class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-800">
+                        ¿Cómo usar?
+                    </h3>
+                    <div class="space-y-2 text-sm text-gray-600">
+                        <p>• Escribe preguntas sobre lugares en Huancayo</p>
+                        <p>• Usa los filtros para búsquedas específicas</p>
+                        <p>• Haz clic en "Nuevo Chat" para empezar de nuevo</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        const messagesContainer = document.getElementById('messages');
-        const messageInput = document.getElementById('messageInput');
-        const sendButton = document.getElementById('sendButton');
-        const typingIndicator = document.getElementById('typing');
-
-        // Cargar estadísticas iniciales
-        fetch('/api/stats')
-            .then(response => response.json())
-            .then(data => {
-                if (data.estado === 'con_bd') {
-                    document.getElementById('stats-text').textContent = 
-                        `${data.total_lugares} lugares • ${data.categorias.length} categorías • IA activa`;
-                } else if (data.estado === 'modo_sin_bd') {
-                    document.getElementById('stats-text').textContent = 
-                        'IA activa • Modo sin base de datos';
-                } else {
-                    document.getElementById('stats-text').textContent = 
-                        'IA activa • Error en base de datos';
-                }
-            })
-            .catch(() => {
-                document.getElementById('stats-text').textContent = 'IA Gemini activa • Conectado a datos';
-            });
-
-        function addMessage(text, isUser = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.innerHTML = text.replace(/\n/g, '<br>');
-            
-            messageDiv.appendChild(contentDiv);
-            messagesContainer.appendChild(messageDiv);
-            
-            // Auto-scroll
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function showTyping() {
-            typingIndicator.style.display = 'block';
-            // asegurar texto del indicador
-            const nodes = Array.from(typingIndicator.childNodes);
-            let textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE);
-            if (!textNode) {
-                textNode = document.createTextNode(' La IA está escribiendo...');
-                typingIndicator.appendChild(textNode);
-            } else {
-                textNode.textContent = ' La IA está escribiendo...';
-            }
-            sendButton.disabled = true;
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function hideTyping() {
-            typingIndicator.style.display = 'none';
-            // restablecer el texto para futuros usos
-            const nodes = Array.from(typingIndicator.childNodes);
-            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE);
-            if (textNode) textNode.textContent = ' La IA está escribiendo...';
-            sendButton.disabled = false;
-        }
-
-        async function sendMessage() {
-            const message = messageInput.value.trim();
-            if (!message) return;
-
-            // Agregar mensaje del usuario
-            addMessage(message, true);
-            messageInput.value = '';
-
-            // Mostrar indicador de escritura
-            showTyping();
-
-            try {
-                // Enviar mensaje usando fetch para iniciar el streaming
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ message: message, stream: true })
+        // Variables globales
+        var conversationHistory = [];
+        var currentCategory = null;
+        
+        // Función para actualizar estadísticas básicas del sidebar
+        function updateSidebarStats() {
+            fetch('/api/stats')
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    // Actualizar solo el sidebar
+                    document.getElementById('sidebar-places-count').textContent = data.total_lugares;
+                    document.getElementById('sidebar-chats-count').textContent = data.chats_hoy;
+                })
+                .catch(function(error) {
+                    console.error('Error al actualizar estadísticas:', error);
                 });
-                
-                // Crear elemento para la respuesta del bot
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'message bot';
-                
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'message-content';
-                contentDiv.id = 'current-response';
-                contentDiv.innerHTML = ''; // Inicialmente vacío
-                
-                messageDiv.appendChild(contentDiv);
-                
-                // Mantener el indicador de escritura visible hasta que comience a llegar la respuesta
-                messagesContainer.appendChild(messageDiv);
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                
-                // Usar la respuesta directamente como fuente de eventos
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                
-                // Función para leer los chunks optimizada
-                async function readStream() {
-                    try {
-                        let buffer = '';
-                        let fullResponse = '';
-                        
-                        while (true) {
-                            const {value, done} = await reader.read();
-                            
-                            if (done) break;
-                            
-                            buffer += decoder.decode(value, {stream: true});
-                            
-                            // Procesar solo cuando tenemos líneas completas
-                            const lines = buffer.split('\n\n');
-                            buffer = lines.pop() || ''; // Mantener última línea incompleta
-                            
-                            for (const line of lines) {
-                                if (line.startsWith('data: ')) {
-                                    try {
-                                        const data = JSON.parse(line.substring(6));
-                                        
-                                        if (data.chunk) {
-                                            // Acumular el texto completo
-                                            fullResponse += data.chunk;
-                                            // Mostrar el texto acumulado
-                                            contentDiv.innerHTML = formatResponse(fullResponse);
-                                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                                        }
-                                        
-                                        if (data.done) {
-                                            // Aplicar formato final a la respuesta completa
-                                            contentDiv.innerHTML = formatResponse(fullResponse);
-                                            hideTyping();
-                                            return;
-                                        }
-                                    } catch (parseError) {
-                                        console.warn('Error parseando JSON:', parseError);
-                                    }
-                                }
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error leyendo stream:', error);
-                        if (contentDiv.innerHTML === '') {
-                            contentDiv.innerHTML = 'Lo siento, hubo un error al procesar tu pregunta.';
-                        }
-                        hideTyping();
+        }
+        
+        // Función para cargar lugares en la pantalla principal
+        function loadMainPlaces(category) {
+            if (category === undefined) category = null;
+            console.log('=== LOADMAINPLACES INICIADO ===');
+            console.log('Categoria:', category);
+            
+            var url = '/api/places';
+            var params = new URLSearchParams();
+            if (category) params.append('category', category);
+            if (params.toString()) url += '?' + params.toString();
+            
+            console.log('Llamando a:', url);
+            fetch(url)
+                .then(function(response) {
+                    if (!response.ok) {
+                        throw new Error('HTTP error! status: ' + response.status);
                     }
-                }
-                
-                // Función para formatear la respuesta con mejor presentación (estilo apps de mensajería)
-                function formatResponse(text) {
-                    if (!text) return text;
+                    return response.json();
+                })
+                .then(function(data) {
+                    console.log('Datos recibidos para pantalla principal:', data);
                     
-                    // Primero manejar los saltos de línea dobles para crear párrafos
-                    let result = text;
+                    var mainPlacesList = document.getElementById('main-places-list');
+                    console.log('Elemento mainPlacesList encontrado:', !!mainPlacesList);
                     
-                    // Convertir saltos de línea dobles en párrafos separados
-                    const paragraphs = result.split('\n\n');
-                    let formattedParagraphs = [];
-                    
-                    for (let para of paragraphs) {
-                        if (para.trim() === '') continue;
-                        
-                        // Manejar listas dentro de cada párrafo
-                        const lines = para.split('\n');
-                        let paraResult = '';
-                        let inList = false;
-                        
-                        for (let i = 0; i < lines.length; i++) {
-                            let line = lines[i].trim();
-                            
-                            // Procesar imágenes en formato Markdown: ![alt text](url)
-                            line = line.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function(match, alt, url) {
-                                // Crear tarjeta visual para la imagen (estilo WhatsApp/Instagram)
-                                return `
-                                    <div class="image-card" style="
-                                        background: white;
-                                        border-radius: 12px;
-                                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                                        margin: 12px 0;
-                                        overflow: hidden;
-                                        max-width: 320px;
-                                        display: inline-block;
-                                    ">
-                                        <div class="image-container" style="
-                                            position: relative;
-                                            width: 100%;
-                                            height: 200px;
-                                            overflow: hidden;
-                                        ">
-                                            <img src="${url}" alt="${alt}" title="${alt}" style="
-                                                width: 100%;
-                                                height: 100%;
-                                                object-fit: cover;
-                                                border-radius: 0;
-                                                margin: 0;
-                                                display: block;
-                                            ">
-                                            <div class="image-overlay" style="
-                                                position: absolute;
-                                                bottom: 0;
-                                                left: 0;
-                                                right: 0;
-                                                background: linear-gradient(transparent, rgba(0,0,0,0.6));
-                                                padding: 20px 12px 12px;
-                                                color: white;
-                                                font-size: 12px;
-                                                font-weight: 500;
-                                            ">${alt}</div>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                            
-                            // Detectar líneas de lista
-                            if (line.match(/^\s*[*\-]\s+/)) {
-                                if (!inList) {
-                                    paraResult += '<ul>';
-                                    inList = true;
-                                }
-                                const content = line.replace(/^\s*[*\-]\s+/, '');
-                                // Aplicar negritas dentro del contenido
-                                const formattedContent = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                                paraResult += `<li>${formattedContent}</li>`;
-                            } else {
-                                if (inList) {
-                                    paraResult += '</ul>';
-                                    inList = false;
-                                }
-                                
-                                // Aplicar negritas a texto entre asteriscos dobles
-                                line = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                                
-                                // Manejar títulos
-                                if (line.match(/^###\s+/)) {
-                                    const content = line.replace(/^###\s+/, '');
-                                    paraResult += `<h4>${content}</h4>`;
-                                } else if (line.match(/^##\s+/)) {
-                                    const content = line.replace(/^##\s+/, '');
-                                    paraResult += `<h3>${content}</h3>`;
-                                } else if (line.match(/^#\s+/)) {
-                                    const content = line.replace(/^#\s+/, '');
-                                    paraResult += `<h2>${content}</h2>`;
-                                } else if (line.trim() !== '') {
-                                    paraResult += line;
-                                }
-                            }
-                        }
-                        
-                        if (inList) {
-                            paraResult += '</ul>';
-                        }
-                        
-                        if (paraResult.trim() !== '') {
-                            formattedParagraphs.push(paraResult);
-                        }
+                    if (!mainPlacesList) {
+                        console.error('No se encontro el elemento main-places-list');
+                        return;
                     }
                     
-                    // Unir párrafos con espacio entre ellos
-                    return formattedParagraphs.join('<br><br>');
-                }
+                    var lugares = data.places || data.lugares || data || [];
+                    console.log('Lugares procesados para pantalla principal:', lugares);
+                    console.log('Numero de lugares:', lugares.length);
+                    
+                    renderPlaces(lugares);
+                    
+                    console.log('=== LOADMAINPLACES FINALIZADO ===');
+                })
+                .catch(function(error) {
+                    console.error('=== ERROR EN LOADMAINPLACES ===');
+                    console.error('Error:', error);
+                    
+                    var mainPlacesList = document.getElementById('main-places-list');
+                    if (mainPlacesList) {
+                        mainPlacesList.innerHTML = '<div class="text-center py-8 text-red-500"><i class="fas fa-exclamation-triangle text-4xl mb-3"></i><p>Error al cargar lugares</p><p class="text-sm">Por favor, intenta nuevamente</p></div>';
+                    }
+                });
+        }
+
+        function renderPlaces(lugares) {
+            var mainPlacesList = document.getElementById('main-places-list');
+            if (!mainPlacesList) {
+                console.error('No se encontro el elemento main-places-list');
+                return;
+            }
+
+            if (lugares.length > 0) {
+                console.log('Generando HTML para lugares...');
+                var html = lugares.map(function(place) {
+                    return '<div class="bg-gradient-to-br from-white to-gray-50 rounded-xl p-4 hover:shadow-lg transition-all duration-300 border border-gray-100 hover:border-green-200">' +
+                        '<div class="flex items-start space-x-4">' +
+                            '<div class="flex-1 min-w-0">' +
+                                '<h4 class="text-lg font-bold text-gray-900 mb-1">' + (place.nombre || 'Sin nombre') + '</h4>' +
+                                '<p class="text-sm text-gray-600 mb-2">' + (place.descripcion || 'Sin descripcion') + '</p>' +
+                                '<div class="flex items-center space-x-2 mb-2">' +
+                                    '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + 
+                                        (place.categoria === 'parques' ? 'bg-green-100 text-green-800' : 
+                                         place.categoria === 'plazas' ? 'bg-blue-100 text-blue-800' : 
+                                         'bg-gray-100 text-gray-800') + '">' +
+                                        (place.categoria || 'Sin categoria') +
+                                    '</span>' +
+                                    '<span class="text-xs text-gray-500">' + 
+                                        (place.ubicacion || 'Ubicacion no especificada') + 
+                                    '</span>' +
+                                '</div>' +
+                                (place.imagen_url ? '<img src="' + place.imagen_url + '" alt="' + place.nombre + '" class="w-full h-32 object-cover rounded-lg shadow-sm mt-2" onerror="this.style.display=\'none\'">' : '') +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+                }).join('');
                 
-                // Iniciar la lectura del stream
-                 readStream();
-            } catch (error) {
-                hideTyping();
-                addMessage('Lo siento, hubo un error al conectar con el servicio de IA. Por favor, intenta de nuevo.');
-                console.error('Error:', error);
+                mainPlacesList.innerHTML = html;
+                console.log('Se renderizaron', lugares.length, 'lugares');
+            } else {
+                mainPlacesList.innerHTML = '<div class="text-center py-12 text-gray-500"><i class="fas fa-search text-5xl mb-4 opacity-50"></i><p class="text-lg">No se encontraron lugares</p><p class="text-sm mt-1">Intenta con otra categoria o busqueda</p></div>';
+            }
+        }
+        
+        // Función para mostrar todos los lugares
+        function showAllPlaces(event) {
+            currentCategory = null;
+            
+            // Actualizar UI de botones
+            document.querySelectorAll('.category-filter').forEach(function(btn) {
+                btn.classList.remove('active');
+            });
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
+            
+            // Actualizar lista de lugares en la pantalla principal
+            loadMainPlaces();
+        }
+        
+        // Función para nuevo chat
+        function newChat() {
+            // Limpiar historial de conversacion
+            conversationHistory = [];
+            currentCategory = null;
+            
+            // Limpiar mensajes
+            var messagesContainer = document.getElementById('messages');
+            messagesContainer.innerHTML = '<div class="flex items-start space-x-3 mb-4 fade-in">' + 
+                '<div class="bg-primary text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">' + 
+                    'IA' + 
+                '</div>' + 
+                '<div class="bg-gray-100 rounded-lg px-4 py-3 max-w-xs lg:max-w-md">' + 
+                    '<p class="text-gray-800">Hola! Soy tu asistente de IA con informacion sobre lugares turisticos en Huancayo.</p>' + 
+                    '<p class="text-gray-800 mt-2">Que te gustaria conocer?</p>' + 
+                '</div>' + 
+            '</div>';
+            
+            // Limpiar UI de botones
+            document.querySelectorAll('.category-filter').forEach(function(btn) {
+                btn.classList.remove('active');
+            });
+            
+            // Mostrar todos los lugares por defecto
+            setTimeout(function() {
+                showAllPlaces(null);
+            }, 1000);
+        }
+        
+        // Función para enviar mensaje
+        function sendMessage() {
+            var input = document.getElementById('message-input');
+            var message = input.value.trim();
+            
+            if (!message) return;
+            
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // Ya no detectamos categorías manualmente, la IA lo hará automáticamente
+            showTypingIndicator();
+            
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    auto_filter: true // Indicamos al backend que queremos filtrado automático
+                })
+            })
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    hideTypingIndicator();
+                    
+                    if (data.category) {
+                        currentCategory = data.category;
+                        // Actualizar botones activos
+                        document.querySelectorAll('.category-filter').forEach(function(btn) {
+                            btn.classList.remove('active');
+                            if (btn.dataset.category === data.category || 
+                                (data.category === 'todos' && btn.onclick.toString().includes('todos'))) {
+                                btn.classList.add('active');
+                            }
+                        });
+                        
+                        // Si la IA detectó una categoría, actualizar la vista
+                        if (data.category === 'todos') {
+                            loadMainPlaces();
+                        } else {
+                            loadMainPlaces(data.category);
+                        }
+                    }
+                    
+                    if (data.places && data.places.length > 0) {
+                        renderPlaces(data.places);
+                    }
+                    
+                    if (data.response) {
+                        addMessage(data.response, 'bot');
+                        conversationHistory.push({
+                            user: message,
+                            bot: data.response
+                        });
+                    } else {
+                        addMessage('Lo siento, ocurrió un error al procesar tu mensaje.', 'bot');
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error al enviar mensaje:', error);
+                    hideTypingIndicator();
+                    addMessage('Lo siento, ocurrió un error al procesar tu mensaje. Por favor, intenta nuevamente.', 'bot');
+                });
+        }
+        
+        // FunciÃ³n para enviar sugerencia
+        function sendSuggestion(suggestion) {
+            document.getElementById('message-input').value = suggestion;
+            sendMessage();
+        }
+        
+        // FunciÃ³n para agregar mensaje
+        function addMessage(text, sender) {
+            var messagesContainer = document.getElementById('messages');
+            var messageDiv = document.createElement('div');
+            messageDiv.className = "flex items-start space-x-3 mb-4 fade-in " + (sender === 'user' ? 'flex-row-reverse space-x-reverse' : '');
+            
+            // Formatear el texto (convertir markdown a HTML)
+            var formattedText = formatResponse(text);
+            
+            messageDiv.innerHTML = '<div class="' + (sender === 'user' ? 'bg-accent text-white' : 'bg-primary text-white') + ' w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">' + (sender === 'user' ? 'Tu' : 'IA') + '</div>' + '<div class="' + (sender === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-800') + ' rounded-lg px-4 py-3 max-w-xs lg:max-w-md">' + formattedText + '</div>';
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        // FunciÃ³n para formatear respuestas (markdown a HTML)
+        function formatResponse(text) {
+            // Convertir imÃ¡genes markdown a HTML
+            text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function(match, alt, src) {
+                return '<img src="' + src + '" alt="' + alt + '" class="response-image rounded-lg cursor-pointer hover:opacity-90 transition-opacity" onclick="openImageModal(\'' + src + '\', \'' + alt + '\')">'; 
+            });
+            
+            // Convertir negritas
+            text = text.replace(/\*\*([^*]+)\*\*/g, '<strong class="font-bold">$1</strong>');
+            
+            // Convertir cursivas
+            text = text.replace(/\*([^*]+)\*/g, '<em class="italic">$1</em>');
+            
+            // Convertir enlaces
+            text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-blue-600 hover:text-blue-800 underline">$1</a>');
+            
+            // Convertir listas
+            text = text.replace(/^\* (.+)$/gm, '<li class="ml-4">$1</li>');
+            if (text.includes('<li>')) {
+                text = '<ul class="list-disc space-y-1">' + text + '</ul>';
+            }
+            
+            // Convertir saltos de lÃ­nea
+            text = text.replace(/\n/g, '<br>');
+            
+            return text;
+        }
+
+        // FunciÃ³n para mostrar indicador de escritura
+        function showTypingIndicator() {
+            var messagesContainer = document.getElementById('messages');
+            var typingDiv = document.createElement('div');
+            typingDiv.id = 'typing-indicator';
+            typingDiv.className = 'flex items-start space-x-3 mb-4';
+            typingDiv.innerHTML = '<div class="bg-primary text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold">IA</div><div class="bg-gray-100 rounded-lg px-4 py-3"><div class="flex space-x-1"><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div></div></div>';
+            messagesContainer.appendChild(typingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // FunciÃ³n para ocultar indicador de escritura
+        function hideTypingIndicator() {
+            var typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) {
+                typingIndicator.remove();
             }
         }
 
-        function sendSuggestion(text) {
-            messageInput.value = text;
-            sendMessage();
+        // FunciÃ³n para abrir modal de imagen
+        function openImageModal(src, alt) {
+            var modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 cursor-pointer';
+            modal.innerHTML = '<div class="bg-white rounded-lg max-w-4xl max-h-full overflow-hidden">' + 
+                    '<div class="flex justify-between items-center p-4 border-b">' + 
+                        '<h3 class="text-lg font-semibold">' + alt + '</h3>' + 
+                        '<button onclick="this.closest(\'.fixed\').remove()" class="text-gray-500 hover:text-gray-700">' + 
+                            '<i class="fas fa-times"></i>' + 
+                        '</button>' + 
+                    '</div>' + 
+                    '<div class="p-4">' + 
+                        '<img src="' + src + '" alt="' + alt + '" class="max-w-full max-h-96 object-contain rounded-lg">' + 
+                    '</div>' + 
+                '</div>';
+            
+            // Cerrar modal al hacer clic fuera
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+            
+            document.body.appendChild(modal);
         }
 
         // Event listeners
-        messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
+        document.getElementById('message-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
                 sendMessage();
             }
         });
 
-        // Listener for new chat button
-        const newChatButton = document.getElementById('new-chat-button');
-        newChatButton.addEventListener('click', () => {
-            fetch('/api/dashboard/clear-cache', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    messagesContainer.innerHTML = '';
-                    addMessage('¡Bienvenido a un nuevo chat! ¿En qué puedo ayudarte sobre Huancayo?', false);
-                } else {
-                    alert('Error al limpiar caché');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Error al conectar con el servidor');
-            });
-        });
-
-        // Enfocar el input al cargar
-        messageInput.focus();
-
-        // Función para abrir imagen en modal (estilo WhatsApp/Instagram)
-        function openImageModal(imageSrc, imageAlt) {
-            // Crear modal si no existe
-            let modal = document.getElementById('image-modal');
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = 'image-modal';
-                modal.innerHTML = `
-                    <div class="modal-overlay" style="
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        background: rgba(0,0,0,0.9);
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        z-index: 1000;
-                        cursor: pointer;
-                    ">
-                        <div class="modal-content" style="
-                            position: relative;
-                            max-width: 90vw;
-                            max-height: 90vh;
-                            background: transparent;
-                        ">
-                            <img id="modal-image" style="
-                                max-width: 100%;
-                                max-height: 90vh;
-                                object-fit: contain;
-                                border-radius: 8px;
-                            ">
-                            <div class="modal-caption" style="
-                                position: absolute;
-                                bottom: -40px;
-                                left: 0;
-                                right: 0;
-                                color: white;
-                                text-align: center;
-                                font-size: 14px;
-                                padding: 10px;
-                            "></div>
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-                
-                // Cerrar modal al hacer clic
-                modal.addEventListener('click', function(e) {
-                    if (e.target === modal || e.target.classList.contains('modal-overlay')) {
-                        modal.style.display = 'none';
-                    }
-                });
-            }
+        // Inicializar cuando el DOM esté listo
+        document.addEventListener('DOMContentLoaded', function() {
+            showAllPlaces(null);
+            updateSidebarStats();
             
-            // Configurar imagen y mostrar modal
-            const modalImage = document.getElementById('modal-image');
-            const modalCaption = modal.querySelector('.modal-caption');
-            modalImage.src = imageSrc;
-            modalCaption.textContent = imageAlt;
-            modal.style.display = 'flex';
-            
-            // Cerrar con tecla ESC
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') {
-                    modal.style.display = 'none';
-                }
-            });
-        }
-
-        // Agregar event listeners a las tarjetas de imagen (delegación de eventos)
-        document.addEventListener('click', function(e) {
-            // Buscar la tarjeta de imagen más cercana
-            const imageCard = e.target.closest('.image-card');
-            if (imageCard) {
-                const img = imageCard.querySelector('img');
-                if (img) {
-                    openImageModal(img.src, img.alt);
-                }
-            }
+            // Actualizar estadísticas cada 30 segundos
+            setInterval(updateSidebarStats, 30000);
         });
     </script>
 </body>

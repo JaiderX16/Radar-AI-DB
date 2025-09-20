@@ -16,6 +16,3 @@ DB_PORT = int(os.getenv('DB_PORT', '3306'))
 DB_USER = os.getenv('DB_USER', 'root')
 DB_PASSWORD = os.getenv('DB_PASSWORD', '')
 DB_NAME = os.getenv('DB_NAME', 'huancayo_db')
-
-# API Key de Google Gemini
-GEMINI_API_KEY = 'AIzaSyBXyn-bexp9WdEIUvnSNq3uCkQfydjzsa0'
